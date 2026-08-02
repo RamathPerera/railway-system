@@ -283,3 +283,82 @@ export const getBookingById = async (bookingId: string): Promise<BookingSummary>
   };
 };
 
+export interface BookingLifecycleResult {
+  message: string;
+  booking: {
+    id: string;
+    status: string;
+  };
+}
+
+export const confirmBooking = async (bookingId: string): Promise<BookingLifecycleResult> => {
+  return sequelize.transaction(async (transaction) => {
+    const booking = await Booking.findByPk(bookingId, { transaction });
+
+    if (!booking) {
+      throw new BookingError('Booking not found', 404);
+    }
+
+    if (booking.status !== 'PENDING') {
+      throw new BookingError('Booking is not pending and cannot be confirmed', 400);
+    }
+
+    await booking.update({ status: 'CONFIRMED' }, { transaction });
+
+    // Release the temporary locks — the seats are now permanently booked.
+    const segments = await BookingSegment.findAll({
+      where: { bookingId },
+      attributes: ['tripSeatId'],
+      transaction,
+    });
+    const seatIds = segments.map((segment) => segment.tripSeatId);
+    if (seatIds.length > 0) {
+      await TripSeat.update(
+        { lockedUntil: null },
+        { where: { id: { [Op.in]: seatIds } }, transaction }
+      );
+    }
+
+    return {
+      message: 'Booking confirmed',
+      booking: { id: booking.id, status: booking.status },
+    };
+  });
+};
+
+export const cancelBooking = async (bookingId: string): Promise<BookingLifecycleResult> => {
+  return sequelize.transaction(async (transaction) => {
+    const booking = await Booking.findByPk(bookingId, { transaction });
+
+    if (!booking) {
+      throw new BookingError('Booking not found', 404);
+    }
+
+    if (booking.status === 'CANCELLED') {
+      throw new BookingError('Booking is already cancelled', 400);
+    }
+
+    await booking.update({ status: 'CANCELLED' }, { transaction });
+
+    // Release any temporary locks so the seats return to Available.
+    const segments = await BookingSegment.findAll({
+      where: { bookingId },
+      attributes: ['tripSeatId'],
+      transaction,
+    });
+    const seatIds = segments.map((segment) => segment.tripSeatId);
+    if (seatIds.length > 0) {
+      await TripSeat.update(
+        { lockedUntil: null },
+        { where: { id: { [Op.in]: seatIds } }, transaction }
+      );
+    }
+
+    return {
+      message: 'Booking cancelled',
+      booking: { id: booking.id, status: booking.status },
+    };
+  });
+};
+
+

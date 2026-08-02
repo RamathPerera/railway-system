@@ -1,6 +1,13 @@
 import type { Request, Response } from 'express';
-import { createBooking, getBookingById, BookingError } from '../services/bookingService.js';
+import {
+  createBooking,
+  getBookingById,
+  confirmBooking,
+  cancelBooking,
+  BookingError,
+} from '../services/bookingService.js';
 import { createBookingSchema, getBookingByIdParamsSchema } from '../utils/validation.js';
+
 
 
 export const createBookingHandler = async (req: Request, res: Response) => {
@@ -57,4 +64,53 @@ export const getBookingHandler = async (req: Request, res: Response) => {
     return res.status(500).json({ error: 'Internal Server Error' });
   }
 };
+
+export const confirmBookingHandler = async (req: Request, res: Response) => {
+  const parsed = getBookingByIdParamsSchema.safeParse(req.params);
+
+  if (!parsed.success) {
+    return res.status(400).json({
+      error: 'Invalid request parameters',
+      details: parsed.error.flatten().fieldErrors,
+    });
+  }
+
+  const { id } = parsed.data;
+
+  try {
+    const result = await confirmBooking(id);
+    return res.json(result);
+  } catch (error) {
+    if (error instanceof BookingError) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    console.error('❌ Failed to confirm booking:', error);
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+export const cancelBookingHandler = async (req: Request, res: Response) => {
+  const parsed = getBookingByIdParamsSchema.safeParse(req.params);
+
+  if (!parsed.success) {
+    return res.status(400).json({
+      error: 'Invalid request parameters',
+      details: parsed.error.flatten().fieldErrors,
+    });
+  }
+
+  const { id } = parsed.data;
+
+  try {
+    const result = await cancelBooking(id);
+    return res.json(result);
+  } catch (error) {
+    if (error instanceof BookingError) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    console.error('❌ Failed to cancel booking:', error);
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
 
