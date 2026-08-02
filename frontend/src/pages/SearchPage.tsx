@@ -45,17 +45,22 @@ function SearchPage() {
     queryFn: getStations,
   })
 
-  // Search query — disabled until the user submits the form.
+  // Normalize the date so it is never null/empty during renders (e.g. after
+  // browser autofill or back-navigation resets the input).
+  const safeDate = date || toISODate(new Date())
+
+  // Search query — only runs once the user submits the form (searchParams set).
+  // The query key depends on searchParams, so it auto-fires on submit.
   const searchQuery = useQuery({
     queryKey: ['search', searchParams],
     queryFn: () => searchTrips(searchParams!.date, searchParams!.origin, searchParams!.dest),
-    enabled: false,
+    enabled: Boolean(searchParams),
   })
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!origin || !dest || !date) {
+    if (!origin || !dest || !safeDate) {
       toast.error('Please select origin, destination, and date')
       return
     }
@@ -65,9 +70,9 @@ function SearchPage() {
       return
     }
 
-    setSearchParams({ date, origin, dest })
-    searchQuery.refetch()
+    setSearchParams({ date: safeDate, origin, dest })
   }
+
 
   // Surface query errors via toast.
   if (searchQuery.isError) {
@@ -136,10 +141,11 @@ function SearchPage() {
               <input
                 type="date"
                 className="input-field"
-                value={date}
+                value={safeDate}
                 min={toISODate(new Date())}
                 onChange={(e) => setDate(e.target.value)}
               />
+
             </div>
 
             <div className="flex items-end">

@@ -81,13 +81,18 @@ export const createBooking = async (
 
     const startOrder = Number(startStop.stopOrder);
     const endOrder = Number(endStop.stopOrder);
-    if (startOrder >= endOrder) {
-      throw new BookingError('Start station must be before end station on the route', 422);
+    if (startOrder === endOrder) {
+      throw new BookingError('Start and end stations must be different', 422);
     }
+
+    // Direction-agnostic requested range (trains may travel either way).
+    const reqMin = Math.min(startOrder, endOrder);
+    const reqMax = Math.max(startOrder, endOrder);
 
     const startDistance = Number(startStop.distanceFromOrigin);
     const endDistance = Number(endStop.distanceFromOrigin);
-    const perSeatFare = Math.round((endDistance - startDistance) * PRICE_PER_KM * 100) / 100;
+    const perSeatFare = Math.round(Math.abs(endDistance - startDistance) * PRICE_PER_KM * 100) / 100;
+
 
     // --- Step B: Acquire row locks on the requested seats (serializes concurrent requests). ---
     const seats = await TripSeat.findAll({
@@ -134,9 +139,12 @@ export const createBooking = async (
     const hasOverlap = overlappingSegments.some((segment) => {
       const segStart = Number((segment.get('startStop') as any)?.stopOrder);
       const segEnd = Number((segment.get('endStop') as any)?.stopOrder);
-      // Overlap rule: existing_start < requested_end AND existing_end > requested_start.
-      return segStart < endOrder && segEnd > startOrder;
+      // Direction-agnostic overlap: existing range intersects the requested range.
+      const exMin = Math.min(segStart, segEnd);
+      const exMax = Math.max(segStart, segEnd);
+      return exMin < reqMax && exMax > reqMin;
     });
+
 
     if (hasOverlap) {
       throw new BookingError('One or more seats are already booked for an overlapping segment', 409);

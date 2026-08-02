@@ -33,7 +33,10 @@ export const createBookingSchema = z.object({
   tripId: z.string().uuid('tripId must be a valid trip UUID'),
   startStationId: z.string().uuid('startStationId must be a valid station UUID'),
   endStationId: z.string().uuid('endStationId must be a valid station UUID'),
-  seatIds: z.array(z.string().uuid('each seatId must be a valid seat UUID')).min(1, 'at least one seat is required'),
+  // Kept as an array to support future multi-seat bookings, but restricted to
+  // exactly one seat for now.
+  seatIds: z.array(z.string().uuid('each seatId must be a valid seat UUID')).length(1, 'You can only book 1 seat per transaction for now'),
+
   passengerName: z.string().min(2, 'passengerName must be at least 2 characters'),
   passengerEmail: z.string().email('passengerEmail must be a valid email'),
 });

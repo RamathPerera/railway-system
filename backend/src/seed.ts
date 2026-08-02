@@ -92,7 +92,9 @@ const seed = async () => {
 
       const mainLine = await Route.create({ name: 'Colombo-Badulla Main Line' }, { transaction: t });
 
-      await RouteStop.bulkCreate(
+      // Capture the created RouteStops so we can reference their real UUIDs
+      // (route_stops.id) as the startStopId/endStopId foreign keys on segments.
+      const routeStops = await RouteStop.bulkCreate(
         STATIONS.map((s, index) => ({
           routeId: mainLine.id,
           stationId: stations[index].id,
@@ -101,6 +103,13 @@ const seed = async () => {
         })),
         { transaction: t }
       );
+
+      // Map each stationId -> its RouteStop.id for the mock booking segments.
+      const routeStopByStation = new Map<string, string>();
+      for (const rs of routeStops) {
+        routeStopByStation.set(rs.stationId, rs.id);
+      }
+
 
       // --- Train & Master Coaches (Udarata Menike, 8 coaches) ---
       const menike = await Train.create({ name: 'Udarata Menike', number: '1015' }, { transaction: t });
@@ -180,7 +189,30 @@ const seed = async () => {
       const fareB = roundFare((distBadulla - distKandy) * PRICE_PER_KM);     // 179 * 5 = 895
       const fareC = roundFare((distHatton - distGampaha) * PRICE_PER_KM);    // 162 * 5 = 810
 
+      // Resolve the actual RouteStop UUIDs for the mock segments. These are the
+      // FK targets of booking_segments.start_stop_id / end_stop_id (NOT Station ids).
+      const colomboFortStopId = routeStopByStation.get(stations[0].id);
+      const kandyStopId = routeStopByStation.get(stations[9].id);
+      const badullaStopId = routeStopByStation.get(stations[26].id);
+      const gampahaStopId = routeStopByStation.get(stations[3].id);
+      const hattonStopId = routeStopByStation.get(stations[12].id);
+
+      // Fail fast with a readable message if any required RouteStop is missing.
+      const requiredStops = [
+        ['Colombo Fort', colomboFortStopId],
+        ['Kandy', kandyStopId],
+        ['Badulla', badullaStopId],
+        ['Gampaha', gampahaStopId],
+        ['Hatton', hattonStopId],
+      ] as const;
+      for (const [name, id] of requiredStops) {
+        if (!id) {
+          throw new Error(`Missing RouteStop for station "${name}" - cannot create booking segments`);
+        }
+      }
+
       for (let i = 0; i < trips.length; i++) {
+
         const trip = trips[i];
         const coachASeats = coachASeatIdsByTrip[i];
         const seat1 = coachASeats[0]; // Seat 1
@@ -230,20 +262,22 @@ const seed = async () => {
           { where: { id: seat5 }, transaction: t }
         );
 
-        // BookingSegments for all three bookings (bulk).
+        // BookingSegments for all three bookings (bulk). startStopId/endStopId
+        // must reference route_stops.id (resolved above), NOT station ids.
         await BookingSegment.bulkCreate(
           [
             // Booking 1: two segments (Seats 1 & 2), Colombo Fort -> Kandy.
-            { bookingId: booking1.id, tripId: trip.id, tripSeatId: seat1, startStopId: stations[0].id, endStopId: stations[9].id, fare: fareA },
-            { bookingId: booking1.id, tripId: trip.id, tripSeatId: seat2, startStopId: stations[0].id, endStopId: stations[9].id, fare: fareA },
+            { bookingId: booking1.id, tripId: trip.id, tripSeatId: seat1, startStopId: colomboFortStopId, endStopId: kandyStopId, fare: fareA },
+            { bookingId: booking1.id, tripId: trip.id, tripSeatId: seat2, startStopId: colomboFortStopId, endStopId: kandyStopId, fare: fareA },
             // Booking 2: two segments (Seats 1 & 2), Kandy -> Badulla.
-            { bookingId: booking2.id, tripId: trip.id, tripSeatId: seat1, startStopId: stations[9].id, endStopId: stations[26].id, fare: fareB },
-            { bookingId: booking2.id, tripId: trip.id, tripSeatId: seat2, startStopId: stations[9].id, endStopId: stations[26].id, fare: fareB },
+            { bookingId: booking2.id, tripId: trip.id, tripSeatId: seat1, startStopId: kandyStopId, endStopId: badullaStopId, fare: fareB },
+            { bookingId: booking2.id, tripId: trip.id, tripSeatId: seat2, startStopId: kandyStopId, endStopId: badullaStopId, fare: fareB },
             // Booking 3: one segment (Seat 5), Gampaha -> Hatton.
-            { bookingId: booking3.id, tripId: trip.id, tripSeatId: seat5, startStopId: stations[3].id, endStopId: stations[12].id, fare: fareC },
+            { bookingId: booking3.id, tripId: trip.id, tripSeatId: seat5, startStopId: gampahaStopId, endStopId: hattonStopId, fare: fareC },
           ],
           { transaction: t }
         );
+
       }
 
       // --- Summary ---

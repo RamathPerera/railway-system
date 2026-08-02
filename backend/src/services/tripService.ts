@@ -73,17 +73,19 @@ export const searchTrips = async (
     throw new TripSearchError('No route connects the two stations', 404);
   }
 
-  // 3. Validate travel direction: origin must come before destination.
+  // 3. Validate travel: only the same station is invalid. Trains may travel in
+  //    either direction along the route (bidirectional travel).
   const originOrder = Number(originStop.stopOrder);
   const destOrder = Number(destStop.stopOrder);
-  if (originOrder >= destOrder) {
-    throw new TripSearchError('Origin must be before destination on the route', 422);
+  if (originOrder === destOrder) {
+    throw new TripSearchError('Origin and destination must be different stations', 422);
   }
 
-  // 4. Dynamic pricing: (dest_distance - origin_distance) * PRICE_PER_KM.
+  // 4. Dynamic pricing: |dest_distance - origin_distance| * PRICE_PER_KM.
   const originDistance = Number(originStop.distanceFromOrigin);
   const destDistance = Number(destStop.distanceFromOrigin);
-  const fare = Math.round((destDistance - originDistance) * PRICE_PER_KM * 100) / 100;
+  const fare = Math.round(Math.abs(destDistance - originDistance) * PRICE_PER_KM * 100) / 100;
+
 
   // 5. Fetch all Scheduled trips for the date on this route.
   const trips = await Trip.findAll({
@@ -179,14 +181,19 @@ export const getTripSeatMap = async (
 
   const startOrder = Number(startStop.stopOrder);
   const endOrder = Number(endStop.stopOrder);
-  if (startOrder >= endOrder) {
-    throw new TripSearchError('Start station must be before end station on the route', 422);
+  if (startOrder === endOrder) {
+    throw new TripSearchError('Start and end stations must be different', 422);
   }
 
-  // --- Step B: Paginate the coaches for this trip. ---
+  // Direction-agnostic requested range (trains may travel either way).
+  const reqMin = Math.min(startOrder, endOrder);
+  const reqMax = Math.max(startOrder, endOrder);
+
+  // --- Step B: Paginate the Reserved coaches for this trip. ---
+  // Unreserved coaches are not shown on the seat map.
   const offset = (page - 1) * limit;
   const { rows: coaches, count: totalCoaches } = await TripCoach.findAndCountAll({
-    where: { tripId },
+    where: { tripId, classType: 'Reserved' },
     order: [['coachNo', 'ASC']],
     limit,
     offset,
@@ -213,11 +220,14 @@ export const getTripSeatMap = async (
   for (const segment of confirmedSegments) {
     const segStart = Number((segment.get('startStop') as any)?.stopOrder);
     const segEnd = Number((segment.get('endStop') as any)?.stopOrder);
-    // Overlap rule: existing_start < requested_end AND existing_end > requested_start.
-    if (segStart < endOrder && segEnd > startOrder) {
+    // Direction-agnostic overlap: existing range intersects the requested range.
+    const exMin = Math.min(segStart, segEnd);
+    const exMax = Math.max(segStart, segEnd);
+    if (exMin < reqMax && exMax > reqMin) {
       bookedSeatIds.add(segment.tripSeatId);
     }
   }
+
 
   // --- Step E: Map each seat to its visual state. ---
   const now = new Date();

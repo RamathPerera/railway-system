@@ -30,10 +30,20 @@ function SeatMapPage() {
   const activeCoach = coaches.find((coach) => coach.id === activeCoachId) ?? coaches[0]
 
   const toggleSeat = (seatId: string) => {
-    setSelectedSeats((prev) =>
-      prev.includes(seatId) ? prev.filter((id) => id !== seatId) : [...prev, seatId]
-    )
+    setSelectedSeats((prev) => {
+      // Clicking the already-selected seat deselects it.
+      if (prev.includes(seatId)) {
+        return prev.filter((id) => id !== seatId)
+      }
+      // Only one seat may be selected at a time for now.
+      if (prev.length >= 1) {
+        toast.error('You can only select 1 seat')
+        return [seatId] // replace the current selection
+      }
+      return [seatId]
+    })
   }
+
 
   const createBookingMutation = useMutation({
     mutationFn: () =>
@@ -82,10 +92,8 @@ function SeatMapPage() {
     }
   }
 
-  const coachHasReserved = (coach: Coach): boolean =>
-    coach.seats.some((seat) => seat.status === 'BOOKED' || seat.status === 'PENDING')
-
   return (
+
     <div className="min-h-screen pb-28">
       {/* Header */}
       <header className="bg-gradient-to-br from-primary via-primary-dark to-slate-900 px-4 py-8 text-white">
@@ -131,12 +139,8 @@ function SeatMapPage() {
                     className={isActive ? 'btn-primary whitespace-nowrap' : 'btn-outline whitespace-nowrap'}
                   >
                     Coach {coach.coachNo}
-                    {coachHasReserved(coach) && (
-                      <span className="ml-1 rounded-full bg-accent px-2 py-0.5 text-xs font-semibold text-white">
-                        Reserved
-                      </span>
-                    )}
                   </button>
+
                 )
               })}
             </div>
