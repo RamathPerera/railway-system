@@ -12,3 +12,19 @@ export const searchTripsSchema = z.object({
 });
 
 export type SearchTripsQuery = z.infer<typeof searchTripsSchema>;
+
+// GET /api/trips/:tripId/seats?start=...&end=...&page=...&limit=...
+export const getTripSeatsParamsSchema = z.object({
+  tripId: z.string().uuid('tripId must be a valid trip UUID'),
+});
+
+export const getTripSeatsQuerySchema = z.object({
+  start: z.string().uuid('start must be a valid station UUID'),
+  end: z.string().uuid('end must be a valid station UUID'),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).default(1),
+});
+
+export type GetTripSeatsParams = z.infer<typeof getTripSeatsParamsSchema>;
+export type GetTripSeatsQuery = z.infer<typeof getTripSeatsQuerySchema>;
+

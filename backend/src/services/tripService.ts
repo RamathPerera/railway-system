@@ -1,5 +1,6 @@
 import { Op } from 'sequelize';
-import { Station, RouteStop, Trip } from '../models/index.js';
+import { Station, RouteStop, Trip, TripCoach, TripSeat, BookingSegment, Booking } from '../models/index.js';
+
 
 // Configurable fare constant (LKR per km). Falls back to 5.0 if not set.
 const PRICE_PER_KM = Number(process.env.PRICE_PER_KM) || 5.0;
@@ -112,3 +113,142 @@ export const searchTrips = async (
     };
   });
 };
+
+export type SeatStatus = 'AVAILABLE' | 'PENDING' | 'BOOKED';
+
+export interface SeatMapSeat {
+  id: string;
+  seatNo: number;
+  status: SeatStatus;
+}
+
+export interface SeatMapCoach {
+  id: string;
+  coachNo: string;
+  classType: string;
+  seats: SeatMapSeat[];
+}
+
+export interface TripSeatMapResult {
+  tripId: string;
+  meta: {
+    currentPage: number;
+    totalPages: number;
+    totalCoaches: number;
+    limit: number;
+  };
+  coaches: SeatMapCoach[];
+}
+
+export const getTripSeatMap = async (
+  tripId: string,
+  startStationId: string,
+  endStationId: string,
+  page: number,
+  limit: number
+): Promise<TripSeatMapResult> => {
+  // --- Step A: Validate the trip, its route, and the requested segment. ---
+  const trip = await Trip.findByPk(tripId, {
+    include: [{ association: 'schedule' }],
+  });
+
+  if (!trip) {
+    throw new TripSearchError('Trip not found', 404);
+  }
+
+  const schedule = trip.get('schedule') as any;
+  const routeId = schedule?.routeId as string | undefined;
+  if (!routeId) {
+    throw new TripSearchError('Trip has no associated route', 404);
+  }
+
+  const routeStops = await RouteStop.findAll({
+    where: {
+      routeId,
+      stationId: { [Op.in]: [startStationId, endStationId] },
+    },
+  });
+
+  const startStop = routeStops.find((rs) => rs.stationId === startStationId);
+  const endStop = routeStops.find((rs) => rs.stationId === endStationId);
+
+  if (!startStop || !endStop) {
+    throw new TripSearchError('Start or end station is not on this trip route', 404);
+  }
+
+  const startOrder = Number(startStop.stopOrder);
+  const endOrder = Number(endStop.stopOrder);
+  if (startOrder >= endOrder) {
+    throw new TripSearchError('Start station must be before end station on the route', 422);
+  }
+
+  // --- Step B: Paginate the coaches for this trip. ---
+  const offset = (page - 1) * limit;
+  const { rows: coaches, count: totalCoaches } = await TripCoach.findAndCountAll({
+    where: { tripId },
+    order: [['coachNo', 'ASC']],
+    limit,
+    offset,
+    distinct: true,
+    // --- Step C: Eager-load the TripSeat snapshot for each paginated coach. ---
+    include: [{ association: 'seats', required: false }],
+  });
+
+  // --- Step D: Find all CONFIRMED segments that overlap the requested range. ---
+  const confirmedSegments = await BookingSegment.findAll({
+    where: { tripId },
+    include: [
+      {
+        association: 'booking',
+        where: { status: 'CONFIRMED' },
+        attributes: [],
+      },
+      { association: 'startStop', attributes: ['stopOrder'] },
+      { association: 'endStop', attributes: ['stopOrder'] },
+    ],
+  });
+
+  const bookedSeatIds = new Set<string>();
+  for (const segment of confirmedSegments) {
+    const segStart = Number((segment.get('startStop') as any)?.stopOrder);
+    const segEnd = Number((segment.get('endStop') as any)?.stopOrder);
+    // Overlap rule: existing_start < requested_end AND existing_end > requested_start.
+    if (segStart < endOrder && segEnd > startOrder) {
+      bookedSeatIds.add(segment.tripSeatId);
+    }
+  }
+
+  // --- Step E: Map each seat to its visual state. ---
+  const now = new Date();
+  const coachesPayload: SeatMapCoach[] = coaches.map((coach) => {
+    const seats = (coach.get('seats') as TripSeat[] | undefined) ?? [];
+    return {
+      id: coach.id,
+      coachNo: coach.coachNo,
+      classType: coach.classType,
+      seats: seats.map((seat) => {
+        let status: SeatStatus = 'AVAILABLE';
+        if (bookedSeatIds.has(seat.id)) {
+          status = 'BOOKED';
+        } else if (seat.lockedUntil && seat.lockedUntil > now) {
+          status = 'PENDING';
+        }
+        return { id: seat.id, seatNo: seat.seatNo, status };
+      }),
+    };
+  });
+
+  const totalPages = Math.max(1, Math.ceil(totalCoaches / limit));
+
+  return {
+    tripId,
+    meta: {
+      currentPage: page,
+      totalPages,
+      totalCoaches,
+      limit,
+    },
+    coaches: coachesPayload,
+  };
+};
+
