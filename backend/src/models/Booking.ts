@@ -23,8 +23,10 @@ Booking.init({
 }, {
   sequelize,
   modelName: 'Booking',
+  paranoid: true, // Soft delete (deleted_at) for audit trail
   underscored: true,
   timestamps: true,
 });
+
 
 export default Booking;

@@ -8,6 +8,7 @@ class BookingSegment extends Model {
   public declare tripSeatId: string;
   public declare startStopId: string;
   public declare endStopId: string;
+  public declare fare: string;
 }
 
 BookingSegment.init({
@@ -17,6 +18,7 @@ BookingSegment.init({
   tripSeatId: { type: DataTypes.UUID, allowNull: false },
   startStopId: { type: DataTypes.UUID, allowNull: false }, // RouteStop ID
   endStopId: { type: DataTypes.UUID, allowNull: false },   // RouteStop ID
+  fare: { type: DataTypes.DECIMAL(10, 2), allowNull: false }, // Per-segment fare (distance-based)
 }, {
   sequelize,
   modelName: 'BookingSegment',
