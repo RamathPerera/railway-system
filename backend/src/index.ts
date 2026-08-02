@@ -2,12 +2,17 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { sequelize } from './models/index.js';
+import stationRoutes from './routes/stationRoutes.js';
 
 dotenv.config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// API Routes
+app.use('/api/stations', stationRoutes);
+
 
 const PORT = process.env.PORT || 5000;
 
