@@ -3,7 +3,8 @@ import { Station, RouteStop, Trip, TripCoach, TripSeat, BookingSegment, Booking 
 
 
 // Configurable fare constant (LKR per km). Falls back to 5.0 if not set.
-const PRICE_PER_KM = Number(process.env.PRICE_PER_KM) || 5.0;
+export const PRICE_PER_KM = Number(process.env.PRICE_PER_KM) || 5.0;
+
 
 // Domain error carrying an HTTP status code so the controller can map it directly.
 export class TripSearchError extends Error {

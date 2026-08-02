@@ -4,6 +4,8 @@ import dotenv from 'dotenv';
 import { sequelize } from './models/index.js';
 import stationRoutes from './routes/stationRoutes.js';
 import tripRoutes from './routes/tripRoutes.js';
+import bookingRoutes from './routes/bookingRoutes.js';
+
 
 
 dotenv.config();
@@ -15,6 +17,8 @@ app.use(express.json());
 // API Routes
 app.use('/api/stations', stationRoutes);
 app.use('/api/trips', tripRoutes);
+app.use('/api/bookings', bookingRoutes);
+
 
 
 
