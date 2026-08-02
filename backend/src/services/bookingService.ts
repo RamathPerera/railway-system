@@ -81,17 +81,14 @@ export const createBooking = async (
 
     const startOrder = Number(startStop.stopOrder);
     const endOrder = Number(endStop.stopOrder);
-    if (startOrder === endOrder) {
-      throw new BookingError('Start and end stations must be different', 422);
+    if (startOrder >= endOrder) {
+      throw new BookingError('Invalid segment direction', 422);
     }
-
-    // Direction-agnostic requested range (trains may travel either way).
-    const reqMin = Math.min(startOrder, endOrder);
-    const reqMax = Math.max(startOrder, endOrder);
 
     const startDistance = Number(startStop.distanceFromOrigin);
     const endDistance = Number(endStop.distanceFromOrigin);
-    const perSeatFare = Math.round(Math.abs(endDistance - startDistance) * PRICE_PER_KM * 100) / 100;
+    const perSeatFare = Math.round((endDistance - startDistance) * PRICE_PER_KM * 100) / 100;
+
 
 
     // --- Step B: Acquire row locks on the requested seats (serializes concurrent requests). ---
@@ -113,21 +110,24 @@ export const createBooking = async (
     }
 
     // --- Step C: Concurrency verification for every requested seat. ---
+    // The row-level lock (SELECT ... FOR UPDATE) above serializes concurrent
+    // requests on the same seats. Inside the lock we check for overlapping
+    // segments whose parent Booking is CONFIRMED OR (PENDING with an active
+    // expiry). Segment-aware: a pending booking on a different segment does not
+    // block this seat.
     const now = new Date();
 
-    // C1: Reject any seat that is currently locked by another user.
-    const lockedSeat = seats.find((seat) => seat.lockedUntil && seat.lockedUntil > now);
-    if (lockedSeat) {
-      throw new BookingError('Seat(s) temporarily locked by another user', 409);
-    }
-
-    // C2: Reject any seat with an overlapping CONFIRMED booking for the requested segment.
     const overlappingSegments = await BookingSegment.findAll({
       where: { tripSeatId: { [Op.in]: seatIds } },
       include: [
         {
           association: 'booking',
-          where: { status: 'CONFIRMED' },
+          where: {
+            [Op.or]: [
+              { status: 'CONFIRMED' },
+              { status: 'PENDING', expiresAt: { [Op.gt]: now } },
+            ],
+          },
           attributes: [],
         },
         { association: 'startStop', attributes: ['stopOrder'] },
@@ -139,16 +139,14 @@ export const createBooking = async (
     const hasOverlap = overlappingSegments.some((segment) => {
       const segStart = Number((segment.get('startStop') as any)?.stopOrder);
       const segEnd = Number((segment.get('endStop') as any)?.stopOrder);
-      // Direction-agnostic overlap: existing range intersects the requested range.
-      const exMin = Math.min(segStart, segEnd);
-      const exMax = Math.max(segStart, segEnd);
-      return exMin < reqMax && exMax > reqMin;
+      // Overlap rule: existing_start < requested_end AND existing_end > requested_start.
+      return segStart < endOrder && segEnd > startOrder;
     });
-
 
     if (hasOverlap) {
       throw new BookingError('One or more seats are already booked for an overlapping segment', 409);
     }
+
 
     // --- Step D: Mutate state — lock seats, create the Booking and its BookingSegments. ---
     const lockedUntil = new Date(now.getTime() + LOCK_DURATION_MS);

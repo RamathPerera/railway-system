@@ -73,18 +73,21 @@ export const searchTrips = async (
     throw new TripSearchError('No route connects the two stations', 404);
   }
 
-  // 3. Validate travel: only the same station is invalid. Trains may travel in
-  //    either direction along the route (bidirectional travel).
+  // 3. Validate travel direction. A scheduled trip travels in one specific
+  //    direction (Colombo -> Badulla, stopOrder 1..27). If the origin is not
+  //    before the destination, this train does not serve the requested journey,
+  //    so return an empty result set (frontend shows "No trips found").
   const originOrder = Number(originStop.stopOrder);
   const destOrder = Number(destStop.stopOrder);
-  if (originOrder === destOrder) {
-    throw new TripSearchError('Origin and destination must be different stations', 422);
+  if (originOrder >= destOrder) {
+    return [];
   }
 
-  // 4. Dynamic pricing: |dest_distance - origin_distance| * PRICE_PER_KM.
+  // 4. Dynamic pricing: (dest_distance - origin_distance) * PRICE_PER_KM.
   const originDistance = Number(originStop.distanceFromOrigin);
   const destDistance = Number(destStop.distanceFromOrigin);
-  const fare = Math.round(Math.abs(destDistance - originDistance) * PRICE_PER_KM * 100) / 100;
+  const fare = Math.round((destDistance - originDistance) * PRICE_PER_KM * 100) / 100;
+
 
 
   // 5. Fetch all Scheduled trips for the date on this route.
@@ -185,10 +188,6 @@ export const getTripSeatMap = async (
     throw new TripSearchError('Start and end stations must be different', 422);
   }
 
-  // Direction-agnostic requested range (trains may travel either way).
-  const reqMin = Math.min(startOrder, endOrder);
-  const reqMax = Math.max(startOrder, endOrder);
-
   // --- Step B: Paginate the Reserved coaches for this trip. ---
   // Unreserved coaches are not shown on the seat map.
   const offset = (page - 1) * limit;
@@ -202,14 +201,23 @@ export const getTripSeatMap = async (
     include: [{ association: 'seats', required: false }],
   });
 
-  // --- Step D: Find all CONFIRMED segments that overlap the requested range. ---
-  const confirmedSegments = await BookingSegment.findAll({
+  // --- Step D: Find all segments that overlap the requested range and whose
+  // parent Booking is CONFIRMED OR (PENDING with an active expiry). ---
+  // Segment-aware locking: a pending booking for a different segment must NOT
+  // mark this seat as unavailable.
+  const now = new Date();
+  const overlappingSegments = await BookingSegment.findAll({
     where: { tripId },
     include: [
       {
         association: 'booking',
-        where: { status: 'CONFIRMED' },
-        attributes: [],
+        where: {
+          [Op.or]: [
+            { status: 'CONFIRMED' },
+            { status: 'PENDING', expiresAt: { [Op.gt]: now } },
+          ],
+        },
+        attributes: ['status'],
       },
       { association: 'startStop', attributes: ['stopOrder'] },
       { association: 'endStop', attributes: ['stopOrder'] },
@@ -217,20 +225,23 @@ export const getTripSeatMap = async (
   });
 
   const bookedSeatIds = new Set<string>();
-  for (const segment of confirmedSegments) {
+  const pendingSeatIds = new Set<string>();
+  for (const segment of overlappingSegments) {
     const segStart = Number((segment.get('startStop') as any)?.stopOrder);
     const segEnd = Number((segment.get('endStop') as any)?.stopOrder);
-    // Direction-agnostic overlap: existing range intersects the requested range.
-    const exMin = Math.min(segStart, segEnd);
-    const exMax = Math.max(segStart, segEnd);
-    if (exMin < reqMax && exMax > reqMin) {
-      bookedSeatIds.add(segment.tripSeatId);
+    // Overlap rule: existing_start < requested_end AND existing_end > requested_start.
+    if (segStart < endOrder && segEnd > startOrder) {
+      const bookingStatus = (segment.get('booking') as any)?.status;
+      if (bookingStatus === 'CONFIRMED') {
+        bookedSeatIds.add(segment.tripSeatId);
+      } else {
+        pendingSeatIds.add(segment.tripSeatId);
+      }
     }
   }
 
-
   // --- Step E: Map each seat to its visual state. ---
-  const now = new Date();
+  // Precedence: BOOKED (Red) > PENDING (Yellow) > AVAILABLE (Green).
   const coachesPayload: SeatMapCoach[] = coaches.map((coach) => {
     const seats = (coach.get('seats') as TripSeat[] | undefined) ?? [];
     return {
@@ -241,13 +252,14 @@ export const getTripSeatMap = async (
         let status: SeatStatus = 'AVAILABLE';
         if (bookedSeatIds.has(seat.id)) {
           status = 'BOOKED';
-        } else if (seat.lockedUntil && seat.lockedUntil > now) {
+        } else if (pendingSeatIds.has(seat.id)) {
           status = 'PENDING';
         }
         return { id: seat.id, seatNo: seat.seatNo, status };
       }),
     };
   });
+
 
   const totalPages = Math.max(1, Math.ceil(totalCoaches / limit));
 
