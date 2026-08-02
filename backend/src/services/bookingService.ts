@@ -186,3 +186,100 @@ export const createBooking = async (
     };
   });
 };
+
+export interface BookingSegmentSummary {
+  id: string;
+  seatId: string;
+  seatNo: number;
+  fare: number;
+  startStation: string;
+  endStation: string;
+  trip: {
+    id: string;
+    departureDate: string;
+    status: string;
+    trainName: string;
+    departureTime: string;
+  };
+}
+
+export interface BookingSummary {
+  id: string;
+  passengerName: string;
+  passengerEmail: string;
+  totalFare: number;
+  status: string;
+  expiresAt: Date | null;
+  createdAt: Date;
+  segments: BookingSegmentSummary[];
+}
+
+export const getBookingById = async (bookingId: string): Promise<BookingSummary> => {
+  const booking = await Booking.findByPk(bookingId, {
+    include: [
+      {
+        association: 'segments',
+        include: [
+          { association: 'seat' },
+          {
+            association: 'trip',
+            include: [
+              {
+                association: 'schedule',
+                include: [{ association: 'train' }],
+              },
+            ],
+          },
+          {
+            association: 'startStop',
+            include: [{ association: 'station' }],
+          },
+          {
+            association: 'endStop',
+            include: [{ association: 'station' }],
+          },
+        ],
+      },
+    ],
+  });
+
+  if (!booking) {
+    throw new BookingError('Booking not found', 404);
+  }
+
+  const segments = (booking.get('segments') as any[] | undefined) ?? [];
+
+  return {
+    id: booking.id,
+    passengerName: booking.passengerName,
+    passengerEmail: booking.passengerEmail,
+    totalFare: Number(booking.totalFare),
+    status: booking.status,
+    expiresAt: booking.expiresAt,
+    createdAt: booking.createdAt,
+    segments: segments.map((segment) => {
+      const seat = segment?.seat;
+      const trip = segment?.trip;
+      const schedule = trip?.schedule;
+      const train = schedule?.train;
+      const startStop = segment?.startStop;
+      const endStop = segment?.endStop;
+      return {
+        id: segment.id,
+        seatId: segment.tripSeatId,
+        seatNo: seat?.seatNo ?? 0,
+        fare: Number(segment.fare),
+        startStation: startStop?.station?.name ?? 'Unknown',
+        endStation: endStop?.station?.name ?? 'Unknown',
+        trip: {
+          id: trip?.id ?? '',
+          departureDate: trip?.departureDate ?? '',
+          status: trip?.status ?? '',
+          trainName: train?.name ?? 'Unknown',
+          departureTime: schedule?.departureTime ?? '',
+        },
+      };
+    }),
+  };
+};
+

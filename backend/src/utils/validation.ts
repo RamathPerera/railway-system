@@ -40,4 +40,12 @@ export const createBookingSchema = z.object({
 
 export type CreateBookingBody = z.infer<typeof createBookingSchema>;
 
+// GET /api/bookings/:id
+export const getBookingByIdParamsSchema = z.object({
+  id: z.string().uuid('id must be a valid booking UUID'),
+});
+
+export type GetBookingByIdParams = z.infer<typeof getBookingByIdParamsSchema>;
+
+
 

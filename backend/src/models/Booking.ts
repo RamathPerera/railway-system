@@ -8,7 +8,9 @@ class Booking extends Model {
   public declare totalFare: number;
   public declare status: 'PENDING' | 'CONFIRMED' | 'CANCELLED';
   public declare expiresAt: Date | null;
+  public declare createdAt: Date;
 }
+
 
 Booking.init({
   id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
