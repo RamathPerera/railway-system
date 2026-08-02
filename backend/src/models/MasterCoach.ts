@@ -2,10 +2,10 @@ import { DataTypes, Model } from 'sequelize';
 import sequelize from '../config/database.js';
 
 class MasterCoach extends Model {
-  public id!: string;
-  public train_id!: string;
-  public coach_no!: string;
-  public class_type!: 'Reserved' | 'Unreserved';
+  public declare id: string;
+  public declare trainId: string;
+  public declare coachNo: string;
+  public declare classType: 'Reserved' | 'Unreserved';
 }
 
 MasterCoach.init(
@@ -15,15 +15,15 @@ MasterCoach.init(
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
     },
-    train_id: {
+    trainId: {
       type: DataTypes.UUID,
       allowNull: false,
     },
-    coach_no: {
+    coachNo: {
       type: DataTypes.STRING,
       allowNull: false,
     },
-    class_type: {
+    classType: {
       type: DataTypes.ENUM('Reserved', 'Unreserved'),
       allowNull: false,
     },

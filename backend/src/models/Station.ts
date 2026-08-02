@@ -2,9 +2,9 @@ import { DataTypes, Model } from 'sequelize';
 import sequelize from '../config/database.js';
 
 class Station extends Model {
-  public id!: string;
-  public name!: string;
-  public code!: string;
+  public declare id: string;
+  public declare name: string;
+  public declare code: string;
 }
 
 Station.init(
@@ -24,7 +24,7 @@ Station.init(
       allowNull: false,
       unique: true,
     },
-    deleted_at: {
+    deletedAt: {
       type: DataTypes.DATE,
       allowNull: true,
     },

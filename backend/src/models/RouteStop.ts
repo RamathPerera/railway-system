@@ -2,11 +2,11 @@ import { DataTypes, Model } from 'sequelize';
 import sequelize from '../config/database.js';
 
 class RouteStop extends Model {
-  public id!: string;
-  public route_id!: string;
-  public station_id!: string;
-  public stop_order!: number;
-  public distance_from_origin!: number;
+  public declare id: string;
+  public declare routeId: string;
+  public declare stationId: string;
+  public declare stopOrder: number;
+  public declare distanceFromOrigin: number;
 }
 
 RouteStop.init(
@@ -16,19 +16,19 @@ RouteStop.init(
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
     },
-    route_id: {
+    routeId: {
       type: DataTypes.UUID,
       allowNull: false,
     },
-    station_id: {
+    stationId: {
       type: DataTypes.UUID,
       allowNull: false,
     },
-    stop_order: {
+    stopOrder: {
       type: DataTypes.DECIMAL(5, 2),
       allowNull: false,
     },
-    distance_from_origin: {
+    distanceFromOrigin: {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: false,
     },

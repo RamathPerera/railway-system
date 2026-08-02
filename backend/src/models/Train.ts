@@ -2,9 +2,9 @@ import { DataTypes, Model } from 'sequelize';
 import sequelize from '../config/database.js';
 
 class Train extends Model {
-  public id!: string;
-  public name!: string;
-  public number!: string;
+  public declare id: string;
+  public declare name: string;
+  public declare number: string;
 }
 
 Train.init(
