@@ -90,7 +90,7 @@ The seeder wipes and repopulates the database with:
 - Trip-level coach/seat snapshots
 
 ```bash
-docker exec -it railway_backend_container npm run seed
+docker exec -it railway_backend_container npm run seed:prod
 ```
 
 ---
