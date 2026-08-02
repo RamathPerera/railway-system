@@ -10,7 +10,7 @@ const sequelize = new Sequelize(
   {
     host: process.env.DB_HOST,
     dialect: 'mysql',
-    logging: false, // console එක පිරිසිදුව තබා ගැනීමට
+    logging: false, // To keep the console clean
   }
 );
 
