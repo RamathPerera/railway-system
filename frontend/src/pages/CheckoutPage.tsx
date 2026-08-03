@@ -24,6 +24,8 @@ import {
 } from 'lucide-react'
 
 import { getBooking, confirmBooking, cancelBooking } from '../services/api'
+import { getApiErrorMessage } from '../utils/apiErrors'
+
 
 const formatCurrency = (value: number): string =>
   new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(value)
@@ -72,29 +74,42 @@ function CheckoutPage() {
     const element = ticketRef.current
     if (!element) return
 
-    const canvas = await html2canvas(element, { scale: 2, backgroundColor: '#ffffff' })
-    const imgData = canvas.toDataURL('image/png')
-    const pdf = new jsPDF('p', 'mm', 'a4')
-    const pageWidth = pdf.internal.pageSize.getWidth()
-    const pageHeight = pdf.internal.pageSize.getHeight()
-    const imgWidth = pageWidth
-    const imgHeight = (canvas.height * imgWidth) / canvas.width
+    try {
+      // Brief pause so fonts/layout settle before capturing.
+      await new Promise((resolve) => setTimeout(resolve, 100))
 
-    let heightLeft = imgHeight
-    let position = 0
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        backgroundColor: '#ffffff',
+        useCORS: true,
+      })
+      const imgData = canvas.toDataURL('image/png')
+      const pdf = new jsPDF('p', 'mm', 'a4')
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      const pageHeight = pdf.internal.pageSize.getHeight()
+      const imgWidth = pageWidth
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
 
-    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
-    heightLeft -= pageHeight
+      let heightLeft = imgHeight
+      let position = 0
 
-    while (heightLeft > 0) {
-      position = heightLeft - imgHeight
-      pdf.addPage()
       pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
       heightLeft -= pageHeight
-    }
 
-    pdf.save(`Train_Ticket_${bookingId}.pdf`)
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight
+        pdf.addPage()
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
+        heightLeft -= pageHeight
+      }
+
+      pdf.save(`Train_Ticket_${bookingId}.pdf`)
+    } catch (error) {
+      console.error('Failed to generate PDF:', error)
+      toast.error('Could not generate the E-Ticket PDF. Please try again.')
+    }
   }
+
 
   const confirmMutation = useMutation({
     mutationFn: () => confirmBooking(bookingId!),
@@ -109,7 +124,7 @@ function CheckoutPage() {
       setTimeout(() => navigate('/'), 1500)
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : 'Failed to confirm payment')
+      toast.error(getApiErrorMessage(error, 'Failed to confirm payment'))
     },
   })
 
@@ -120,9 +135,10 @@ function CheckoutPage() {
       navigate('/')
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : 'Failed to cancel booking')
+      toast.error(getApiErrorMessage(error, 'Failed to cancel booking'))
     },
   })
+
 
   if (bookingQuery.isLoading) {
     return (
@@ -151,8 +167,8 @@ function CheckoutPage() {
   const trainNumber = firstSegment?.trip.trainNumber ?? ''
   const routeName = firstSegment?.trip.routeName ?? ''
   const departureTime = firstSegment?.trip.departureTime ?? '—'
-  const departureStation = firstSegment?.startStation ?? '—'
   const seatNumbers = booking.segments.map((segment) => segment.seatNo)
+
 
 
   return (
@@ -239,11 +255,10 @@ function CheckoutPage() {
                 <Clock className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-xs text-body">Departure</p>
-                <p className="font-semibold text-heading">
-                  {departureTime} <span className="font-normal text-body">· {departureStation}</span>
-                </p>
+                <p className="text-xs text-body">Train Origin Departure</p>
+                <p className="font-semibold text-heading">{departureTime}</p>
               </div>
+
             </div>
           </div>
 

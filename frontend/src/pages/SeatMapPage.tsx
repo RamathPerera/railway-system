@@ -7,7 +7,9 @@ import { Loader2, X, CheckCircle2, ArrowLeft, TrainFront } from 'lucide-react'
 
 
 import { getTripSeats, createBooking } from '../services/api'
+import { getApiErrorMessage } from '../utils/apiErrors'
 import type { Coach, Seat } from '../types'
+
 
 
 function SeatMapPage() {
@@ -92,9 +94,10 @@ function SeatMapPage() {
     },
 
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : 'Failed to create booking')
+      toast.error(getApiErrorMessage(error, 'Failed to create booking'))
     },
   })
+
 
   const handleModalSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -160,9 +163,10 @@ function SeatMapPage() {
 
         {seatMapQuery.isError && (
           <div className="card-container text-center text-body">
-            Failed to load the seat map. Please try again.
+            {getApiErrorMessage(seatMapQuery.error, 'Failed to load the seat map. Please try again.')}
           </div>
         )}
+
 
         {seatMapQuery.isSuccess && coaches.length === 0 && (
           <div className="card-container text-center text-body">No coaches available for this trip.</div>
@@ -353,7 +357,9 @@ function SeatMapPage() {
 
             <form onSubmit={handleModalSubmit} className="mt-4 space-y-4">
               <div>
-                <label className="mb-1 block text-sm font-medium text-heading">Full Name</label>
+                <label className="mb-1 block text-sm font-medium text-heading">
+                  Full Name <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
                   className="input-field"
@@ -363,7 +369,9 @@ function SeatMapPage() {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-heading">Email</label>
+                <label className="mb-1 block text-sm font-medium text-heading">
+                  Email <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="email"
                   className="input-field"
@@ -373,7 +381,9 @@ function SeatMapPage() {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-heading">Mobile Number</label>
+                <label className="mb-1 block text-sm font-medium text-heading">
+                  Mobile Number <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="tel"
                   className="input-field"
@@ -383,7 +393,9 @@ function SeatMapPage() {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-heading">NIC (National Identity Card)</label>
+                <label className="mb-1 block text-sm font-medium text-heading">
+                  NIC (National Identity Card) <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
                   className="input-field"
@@ -392,6 +404,7 @@ function SeatMapPage() {
                   onChange={(e) => setNic(e.target.value)}
                 />
               </div>
+
 
               <div className="flex items-center justify-between gap-3 pt-2">
 

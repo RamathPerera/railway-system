@@ -18,7 +18,10 @@ import {
 
 import { getStations, searchTrips } from '../services/api'
 import SearchableSelect from '../components/SearchableSelect'
+import { getApiErrorMessage } from '../utils/apiErrors'
 import type { Trip } from '../types'
+import bgImage from '../assets/train-bg.webp'
+
 
 
 // Returns today's date in YYYY-MM-DD (local time).
@@ -90,10 +93,11 @@ function SearchPage() {
   }
 
 
-  // Surface query errors via toast.
+  // Surface query errors via toast (extract the real backend message).
   if (searchQuery.isError) {
-    toast.error(searchQuery.error instanceof Error ? searchQuery.error.message : 'Failed to search trips')
+    toast.error(getApiErrorMessage(searchQuery.error, 'Failed to search trips'))
   }
+
 
   const trips: Trip[] = searchQuery.data ?? []
 
@@ -107,8 +111,9 @@ function SearchPage() {
       {/* ===== Hero Section ===== */}
       <section
         className="relative bg-cover bg-center px-4 py-20 text-white"
-        style={{ backgroundImage: "url('/src/assets/train-bg.webp')" }}
+        style={{ backgroundImage: `url(${bgImage})` }}
       >
+
         {/* Dark gradient overlay so the search form pops out clearly */}
         <div className="absolute inset-0 bg-gradient-to-b from-slate-900/80 via-slate-900/70 to-slate-900/90" />
 
@@ -227,10 +232,11 @@ function SearchPage() {
                     <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-body">
                       <span className="flex items-center gap-1">
                         <Clock className="h-4 w-4 text-primary" />
-                        Departure from <span className="font-semibold text-heading">{originName ?? 'Origin'}</span> at{' '}
+                        Train Origin Departure:{' '}
                         <span className="font-semibold text-heading">{trip.departureTime}</span>
                       </span>
                     </div>
+
 
                     {/* Live coach badges */}
                     <div className="mt-3 flex flex-wrap items-center gap-2">
