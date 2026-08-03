@@ -65,7 +65,26 @@ Once running:
 
 > The frontend is served by Nginx, which proxies `/api` to the backend — so the browser only ever talks to one origin (no CORS issues).
 
+### Troubleshooting Port Conflicts
+
+If the default ports (**8080** for the frontend, **5000** for the backend) are already in use on your machine, you can override them **without changing any code** by prefixing the command with environment variables:
+
+```bash
+FRONTEND_PORT=3000 BACKEND_PORT=5001 docker compose up --build -d
+```
+
+The host port mappings are configurable via environment variables (with sensible defaults):
+
+| Service  | Env Variable      | Default | Internal Port |
+|----------|-------------------|---------|---------------|
+| Frontend | `FRONTEND_PORT`   | `8080`  | `80`          |
+| Backend  | `BACKEND_PORT`    | `5000`  | `5000`        |
+| Database | `DB_PORT`         | `3306`  | `3306`        |
+
+> If you change the frontend port, access the app at `http://localhost:<NEW_PORT>` — e.g. `http://localhost:3000` when using `FRONTEND_PORT=3000`.
+
 ### Stopping the stack
+
 
 ```bash
 docker compose down
