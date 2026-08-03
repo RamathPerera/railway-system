@@ -193,13 +193,19 @@ export const getTripSeatMap = async (
   const offset = (page - 1) * limit;
   const { rows: coaches, count: totalCoaches } = await TripCoach.findAndCountAll({
     where: { tripId },
-    order: [['coachNo', 'ASC']],
+    // Order coaches by coachNo, and each coach's seats by seatNo ascending so
+    // the seat map renders in a deterministic, sequential layout.
+    order: [
+      ['coachNo', 'ASC'],
+      [{ model: TripSeat, as: 'seats' }, 'seatNo', 'ASC'],
+    ],
     limit,
     offset,
     distinct: true,
     // --- Step C: Eager-load the TripSeat snapshot for each paginated coach. ---
     include: [{ association: 'seats', required: false }],
   });
+
 
 
   // --- Step D: Find all segments that overlap the requested range and whose

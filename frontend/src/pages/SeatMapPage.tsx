@@ -218,27 +218,67 @@ function SeatMapPage() {
             </div>
 
 
-            {/* Seat Grid */}
+            {/* Seat Grid — strict 2x2 layout with aisle */}
             <div className="card-container mt-4">
               <h2 className="heading-3 mb-4">
                 Coach {activeCoach.coachNo} · {activeCoach.classType}
               </h2>
-              <div className="grid grid-cols-4 gap-2">
-                {activeCoach.seats.map((seat, index) => (
-                  <button
-                    key={seat.id}
-                    type="button"
-                    disabled={seat.status !== 'AVAILABLE' && !selectedSeats.includes(seat.id)}
-                    onClick={() => toggleSeat(seat.id)}
-                    className={`h-10 rounded-md text-sm font-semibold shadow-sm transition-all duration-200 ${
-                      index % 4 === 2 ? 'mr-8' : ''
-                    } ${seatClass(seat)}`}
 
-                  >
-                    {seat.seatNo}
-                  </button>
-                ))}
-              </div>
+              {/* Failsafe: sort seats ascending so numbering is always sequential. */}
+              {(() => {
+                const sortedSeats = [...activeCoach.seats].sort((a, b) => a.seatNo - b.seatNo)
+                const rows: Seat[][] = []
+                for (let i = 0; i < sortedSeats.length; i += 4) {
+                  rows.push(sortedSeats.slice(i, i + 4))
+                }
+
+                return (
+                  <div className="mx-auto mt-8 flex max-w-lg flex-col gap-4">
+                    {rows.map((row, rowIndex) => (
+                      <div
+                        key={rowIndex}
+                        className="flex w-full items-center justify-between"
+                      >
+                        {/* Left side: seats 1 & 2 */}
+                        <div className="flex gap-4">
+                          {row.slice(0, 2).map((seat) => (
+                            <button
+                              key={seat.id}
+                              type="button"
+                              disabled={seat.status !== 'AVAILABLE' && !selectedSeats.includes(seat.id)}
+                              onClick={() => toggleSeat(seat.id)}
+                              className={`flex h-14 w-14 items-center justify-center rounded-xl text-lg font-bold shadow-sm transition-all duration-200 ${seatClass(seat)}`}
+                            >
+                              {seat.seatNo}
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Aisle */}
+                        <div className="w-12 text-center text-xs uppercase tracking-widest text-gray-400">
+                          Aisle
+                        </div>
+
+                        {/* Right side: seats 3 & 4 */}
+                        <div className="flex gap-4">
+                          {row.slice(2, 4).map((seat) => (
+                            <button
+                              key={seat.id}
+                              type="button"
+                              disabled={seat.status !== 'AVAILABLE' && !selectedSeats.includes(seat.id)}
+                              onClick={() => toggleSeat(seat.id)}
+                              className={`flex h-14 w-14 items-center justify-center rounded-xl text-lg font-bold shadow-sm transition-all duration-200 ${seatClass(seat)}`}
+                            >
+                              {seat.seatNo}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })()}
+
 
               {/* Legend */}
               <div className="mt-6 flex flex-wrap items-center gap-4 text-sm text-body">
