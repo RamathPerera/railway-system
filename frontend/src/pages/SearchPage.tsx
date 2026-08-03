@@ -9,11 +9,13 @@ import {
   Search,
   ArrowRight,
   Clock,
-  IndianRupee,
   Loader2,
 } from 'lucide-react'
+
 import { getStations, searchTrips } from '../services/api'
+import SearchableSelect from '../components/SearchableSelect'
 import type { Trip } from '../types'
+
 
 // Returns today's date in YYYY-MM-DD (local time).
 const toISODate = (date: Date): string => {
@@ -49,6 +51,16 @@ function SearchPage() {
   // browser autofill or back-navigation resets the input).
   const safeDate = date || toISODate(new Date())
 
+  // Restrict booking window to today .. today + 7 days.
+  const minDate = toISODate(new Date())
+  const maxDate = toISODate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000))
+
+  // Stations sorted alphabetically for a better dropdown UX.
+  const sortedStations = [...(stationsQuery.data ?? [])].sort((a, b) =>
+    a.name.localeCompare(b.name)
+  )
+
+
   // Search query — only runs once the user submits the form (searchParams set).
   // The query key depends on searchParams, so it auto-fires on submit.
   const searchQuery = useQuery({
@@ -81,6 +93,11 @@ function SearchPage() {
 
   const trips: Trip[] = searchQuery.data ?? []
 
+  // Resolve human-readable station names for the router state.
+  const originName = stationsQuery.data?.find((s) => s.id === origin)?.name
+  const destName = stationsQuery.data?.find((s) => s.id === dest)?.name
+
+
   return (
     <div className="min-h-screen">
       {/* ===== Hero Section ===== */}
@@ -97,41 +114,33 @@ function SearchPage() {
             className="card-container mt-8 grid gap-4 text-left sm:grid-cols-2 lg:grid-cols-4"
           >
             <div>
-              <label className="mb-1 flex items-center gap-1.5 text-sm font-medium text-heading">
-                <MapPin className="h-4 w-4 text-primary" /> Origin
-              </label>
-              <select
-                className="input-field"
+              <SearchableSelect
+                options={sortedStations}
                 value={origin}
-                onChange={(e) => setOrigin(e.target.value)}
+                onChange={setOrigin}
                 disabled={stationsQuery.isLoading}
-              >
-                <option value="">Select origin</option>
-                {stationsQuery.data?.map((station) => (
-                  <option key={station.id} value={station.id}>
-                    {station.name}
-                  </option>
-                ))}
-              </select>
+                placeholder="Select origin"
+                label={
+                  <span className="mb-1 flex items-center gap-1.5 text-sm font-medium text-heading">
+                    <MapPin className="h-4 w-4 text-primary" /> Origin
+                  </span>
+                }
+              />
             </div>
 
             <div>
-              <label className="mb-1 flex items-center gap-1.5 text-sm font-medium text-heading">
-                <MapPin className="h-4 w-4 text-primary" /> Destination
-              </label>
-              <select
-                className="input-field"
+              <SearchableSelect
+                options={sortedStations}
                 value={dest}
-                onChange={(e) => setDest(e.target.value)}
+                onChange={setDest}
                 disabled={stationsQuery.isLoading}
-              >
-                <option value="">Select destination</option>
-                {stationsQuery.data?.map((station) => (
-                  <option key={station.id} value={station.id}>
-                    {station.name}
-                  </option>
-                ))}
-              </select>
+                placeholder="Select destination"
+                label={
+                  <span className="mb-1 flex items-center gap-1.5 text-sm font-medium text-heading">
+                    <MapPin className="h-4 w-4 text-primary" /> Destination
+                  </span>
+                }
+              />
             </div>
 
             <div>
@@ -142,11 +151,13 @@ function SearchPage() {
                 type="date"
                 className="input-field"
                 value={safeDate}
-                min={toISODate(new Date())}
+                min={minDate}
+                max={maxDate}
                 onChange={(e) => setDate(e.target.value)}
               />
 
             </div>
+
 
             <div className="flex items-end">
               <button
@@ -196,9 +207,8 @@ function SearchPage() {
                       <span className="flex items-center gap-1">
                         <Clock className="h-4 w-4" /> {trip.departureTime}
                       </span>
-                      <span className="flex items-center gap-1 font-semibold text-heading">
-                        <IndianRupee className="h-4 w-4" /> {formatFare(trip.fare)}
-                      </span>
+                      <span className="font-semibold text-heading">{formatFare(trip.fare)}</span>
+
                     </div>
                   </div>
                 </div>
@@ -207,8 +217,16 @@ function SearchPage() {
                   type="button"
                   className="btn-primary"
                   onClick={() =>
-                    navigate(`/trip/${trip.id}/seats?start=${origin}&end=${dest}`)
+                    navigate(`/trip/${trip.id}/seats?start=${origin}&end=${dest}`, {
+                      state: {
+                        trainName: trip.trainName,
+                        originName,
+                        destName,
+                        date: trip.departureDate,
+                      },
+                    })
                   }
+
                 >
                   Select Seats <ArrowRight className="h-4 w-4" />
                 </button>

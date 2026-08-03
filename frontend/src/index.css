@@ -5,15 +5,16 @@
    Centralized CSS variables mapped to Tailwind utilities.
    ============================================================ */
 @theme {
-  /* Colors */
-  --color-primary: #1e40af;        /* Railway Blue */
-  --color-primary-dark: #1e3a8a;
-  --color-primary-light: #3b82f6;
-  --color-secondary: #0f766e;      /* Teal */
+  /* Colors — soft indigo/blue palette */
+  --color-primary: #6366f1;        /* Indigo-500 */
+  --color-primary-dark: #4f46e5;   /* Indigo-600 */
+  --color-primary-light: #818cf8;  /* Indigo-400 */
+  --color-secondary: #0ea5e9;      /* Sky-500 */
   --color-accent: #f59e0b;         /* Amber */
   --color-background: #f8fafc;     /* Slate-50 */
   --color-heading: #0f172a;        /* Slate-900 */
   --color-body: #475569;           /* Slate-600 */
+
 
   /* Typography */
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -56,26 +57,27 @@
   }
 
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2.5
-           font-semibold text-white transition-colors duration-200
-           hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary-light
-           focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-500
+           px-5 py-2.5 font-semibold text-white shadow-sm transition-all duration-200
+           hover:from-indigo-600 hover:to-blue-600 hover:shadow-md focus:outline-none focus:ring-2
+           focus:ring-primary-light focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60;
   }
 
   .btn-outline {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-primary
-           bg-transparent px-5 py-2.5 font-semibold text-primary transition-colors duration-200
-           hover:bg-primary hover:text-white focus:outline-none focus:ring-2
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-indigo-300
+           bg-transparent px-5 py-2.5 font-semibold text-indigo-600 transition-all duration-200
+           hover:bg-indigo-50 hover:border-indigo-400 focus:outline-none focus:ring-2
            focus:ring-primary-light focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60;
   }
 
   .input-field {
-    @apply w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-heading
-           placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-2
-           focus:ring-primary-light;
+    @apply w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-heading
+           placeholder:text-slate-400 transition-all duration-200 focus:border-primary
+           focus:outline-none focus:ring-2 focus:ring-primary-light;
   }
 
   .card-container {
-    @apply rounded-xl border border-slate-200 bg-white p-5 shadow-sm;
+    @apply rounded-2xl border border-slate-200/70 bg-white p-5 shadow-sm;
   }
+
 }

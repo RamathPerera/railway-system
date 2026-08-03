@@ -14,7 +14,9 @@ import {
   CheckCircle2,
   XCircle,
   Timer,
+  ArrowLeft,
 } from 'lucide-react'
+
 import { getBooking, confirmBooking, cancelBooking } from '../services/api'
 
 const formatCurrency = (value: number): string =>
@@ -111,7 +113,15 @@ function CheckoutPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
+      <button
+        type="button"
+        onClick={() => navigate(-1)}
+        className="mb-4 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium text-body transition-colors hover:bg-slate-100 hover:text-heading"
+      >
+        <ArrowLeft className="h-4 w-4" /> Back
+      </button>
       <h1 className="heading-2 mb-6">Checkout</h1>
+
 
       {/* Status banner */}
       {booking.status === 'CONFIRMED' && (

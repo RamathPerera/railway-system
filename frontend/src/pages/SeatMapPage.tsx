@@ -1,8 +1,10 @@
 import { useState } from 'react'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+
 import { toast } from 'sonner'
-import { Loader2, X, CheckCircle2 } from 'lucide-react'
+import { Loader2, X, CheckCircle2, ArrowLeft } from 'lucide-react'
+
 import { getTripSeats, createBooking } from '../services/api'
 import type { Coach, Seat } from '../types'
 
@@ -13,6 +15,18 @@ function SeatMapPage() {
   const start = searchParams.get('start') ?? ''
   const end = searchParams.get('end') ?? ''
   const navigate = useNavigate()
+  const location = useLocation()
+  const queryClient = useQueryClient()
+
+
+  // Human-readable names passed via router state (fallback for direct URL access).
+  const state = location.state as
+    | Partial<{ trainName: string; originName: string; destName: string }>
+    | null
+  const headerTrain = state?.trainName ?? tripId ?? 'Trip'
+  const headerRoute =
+    state?.originName && state?.destName ? `${state.originName} → ${state.destName}` : '—'
+
 
   const [activeCoachId, setActiveCoachId] = useState<string | null>(null)
   const [selectedSeats, setSelectedSeats] = useState<string[]>([])
@@ -58,8 +72,12 @@ function SeatMapPage() {
       setSelectedSeats([])
       setPassengerName('')
       setPassengerEmail('')
+      // Invalidate the seat map cache so the locked seat no longer shows as
+      // Available (Green) if the user navigates back to this page.
+      queryClient.invalidateQueries({ queryKey: ['seatmap'] })
       navigate(`/booking/${data.booking.id}`)
     },
+
     onError: (error) => {
       toast.error(error instanceof Error ? error.message : 'Failed to create booking')
     },
@@ -77,34 +95,44 @@ function SeatMapPage() {
   const seatClass = (seat: Seat): string => {
     const isSelected = selectedSeats.includes(seat.id)
     if (isSelected) {
-      return 'bg-blue-600 text-white ring-2 ring-blue-600'
+      return 'bg-gradient-to-br from-indigo-500 to-indigo-600 text-white ring-2 ring-offset-2 ring-indigo-400'
     }
     switch (seat.status) {
       case 'AVAILABLE':
-        return 'bg-green-500 text-white hover:bg-green-600'
+        return 'bg-gradient-to-br from-emerald-400 to-emerald-500 text-white hover:from-emerald-500 hover:to-emerald-600'
       case 'BOOKED':
-        return 'bg-red-500 text-white cursor-not-allowed'
+        return 'bg-gradient-to-br from-rose-400 to-rose-500 text-white cursor-not-allowed'
       case 'PENDING':
-        return 'bg-yellow-400 text-white cursor-not-allowed'
+        return 'bg-gradient-to-br from-amber-400 to-amber-500 text-white cursor-not-allowed'
     }
   }
+
 
   return (
 
     <div className="min-h-screen pb-28">
       {/* Header */}
       <header className="bg-gradient-to-br from-primary via-primary-dark to-slate-900 px-4 py-8 text-white">
-        <div className="mx-auto max-w-4xl">
+        <div className="mx-auto max-w-7xl">
+
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="mb-4 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            <ArrowLeft className="h-4 w-4" /> Back
+          </button>
           <h1 className="heading-1 text-white">Select Your Seats</h1>
           <p className="mt-2 text-slate-200">
-            Trip <span className="font-semibold">{tripId}</span> · Start:{' '}
-            <span className="font-semibold">{start}</span> · End:{' '}
-            <span className="font-semibold">{end}</span>
+            Train: <span className="font-semibold">{headerTrain}</span> ·{' '}
+            <span className="font-semibold">{headerRoute}</span>
           </p>
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl px-4 py-8">
+
+      <main className="mx-auto max-w-7xl px-4 py-8">
+
         {seatMapQuery.isLoading && (
           <div className="flex items-center justify-center gap-2 py-16 text-body">
             <Loader2 className="h-5 w-5 animate-spin text-primary" />
@@ -154,9 +182,10 @@ function SeatMapPage() {
                     type="button"
                     disabled={seat.status !== 'AVAILABLE' && !selectedSeats.includes(seat.id)}
                     onClick={() => toggleSeat(seat.id)}
-                    className={`h-10 rounded-md text-sm font-semibold transition-colors ${
+                    className={`h-10 rounded-md text-sm font-semibold shadow-sm transition-all duration-200 ${
                       index % 4 === 2 ? 'mr-8' : ''
                     } ${seatClass(seat)}`}
+
                   >
                     {seat.seatNo}
                   </button>
@@ -186,7 +215,8 @@ function SeatMapPage() {
       {/* Fixed Bottom Bar */}
       {seatMapQuery.isSuccess && coaches.length > 0 && (
         <div className="fixed inset-x-0 bottom-0 border-t border-slate-200 bg-white/95 px-4 py-3 shadow-lg backdrop-blur">
-          <div className="mx-auto flex max-w-4xl items-center justify-between gap-4">
+          <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
+
             <p className="text-sm text-body">
               Total Seats Selected:{' '}
               <span className="font-bold text-heading">{selectedSeats.length}</span>
