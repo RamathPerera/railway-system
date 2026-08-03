@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import html2canvas from 'html2canvas'
+import { jsPDF } from 'jspdf'
 import {
   CreditCard,
   Loader2,
@@ -9,12 +11,16 @@ import {
   Mail,
   Train,
   Clock,
-  MapPin,
   Armchair,
+
   CheckCircle2,
   XCircle,
   Timer,
   ArrowLeft,
+  Phone,
+  IdCard,
+  Download,
+  Route,
 } from 'lucide-react'
 
 import { getBooking, confirmBooking, cancelBooking } from '../services/api'
@@ -35,6 +41,7 @@ function CheckoutPage() {
   const queryClient = useQueryClient()
 
   const [remainingMs, setRemainingMs] = useState<number | null>(null)
+  const ticketRef = useRef<HTMLDivElement>(null)
 
   const bookingQuery = useQuery({
     queryKey: ['booking', bookingId],
@@ -60,11 +67,45 @@ function CheckoutPage() {
 
   const isExpired = remainingMs !== null && remainingMs <= 0
 
+  // Generate and auto-download the E-Ticket PDF from the rendered ticket UI.
+  const downloadTicketPdf = async (): Promise<void> => {
+    const element = ticketRef.current
+    if (!element) return
+
+    const canvas = await html2canvas(element, { scale: 2, backgroundColor: '#ffffff' })
+    const imgData = canvas.toDataURL('image/png')
+    const pdf = new jsPDF('p', 'mm', 'a4')
+    const pageWidth = pdf.internal.pageSize.getWidth()
+    const pageHeight = pdf.internal.pageSize.getHeight()
+    const imgWidth = pageWidth
+    const imgHeight = (canvas.height * imgWidth) / canvas.width
+
+    let heightLeft = imgHeight
+    let position = 0
+
+    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
+    heightLeft -= pageHeight
+
+    while (heightLeft > 0) {
+      position = heightLeft - imgHeight
+      pdf.addPage()
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
+      heightLeft -= pageHeight
+    }
+
+    pdf.save(`Train_Ticket_${bookingId}.pdf`)
+  }
+
   const confirmMutation = useMutation({
     mutationFn: () => confirmBooking(bookingId!),
-    onSuccess: () => {
-      toast.success('Payment confirmed')
+    onSuccess: async () => {
+      toast.success('Payment Successful! E-Ticket Downloaded.')
       queryClient.invalidateQueries({ queryKey: ['booking', bookingId] })
+      try {
+        await downloadTicketPdf()
+      } catch (error) {
+        console.error('Failed to generate PDF:', error)
+      }
       setTimeout(() => navigate('/'), 1500)
     },
     onError: (error) => {
@@ -107,9 +148,12 @@ function CheckoutPage() {
   const firstSegment = booking.segments[0]
   const lastSegment = booking.segments[booking.segments.length - 1]
   const trainName = firstSegment?.trip.trainName ?? 'Unknown'
+  const trainNumber = firstSegment?.trip.trainNumber ?? ''
+  const routeName = firstSegment?.trip.routeName ?? ''
   const departureTime = firstSegment?.trip.departureTime ?? '—'
-  const route = `${firstSegment?.startStation ?? '—'} → ${lastSegment?.endStation ?? '—'}`
+  const departureStation = firstSegment?.startStation ?? '—'
   const seatNumbers = booking.segments.map((segment) => segment.seatNo)
+
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
@@ -121,7 +165,6 @@ function CheckoutPage() {
         <ArrowLeft className="h-4 w-4" /> Back
       </button>
       <h1 className="heading-2 mb-6">Checkout</h1>
-
 
       {/* Status banner */}
       {booking.status === 'CONFIRMED' && (
@@ -143,36 +186,52 @@ function CheckoutPage() {
         </div>
       )}
 
-      {/* Ticket Summary */}
-      <div className="card-container">
-        <div className="flex items-center justify-between border-b border-slate-200 pb-4">
-          <h2 className="heading-3">Ticket Summary</h2>
-          <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold uppercase text-primary">
+      {/* ===== E-Ticket ===== */}
+      <div ref={ticketRef} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        {/* Ticket header */}
+        <div className="flex items-center justify-between bg-gradient-to-br from-indigo-500 to-blue-500 px-6 py-4 text-white">
+          <div className="flex items-center gap-2">
+            <Train className="h-6 w-6" />
+            <div>
+              <p className="text-lg font-bold leading-tight">CeylonRail E-Ticket</p>
+              <p className="text-xs text-indigo-100">Booking Ref: {booking.id.slice(0, 8).toUpperCase()}</p>
+            </div>
+          </div>
+          <span className="rounded-full bg-white/20 px-3 py-1 text-xs font-semibold uppercase tracking-wide">
             {booking.status}
           </span>
         </div>
 
-        <div className="mt-4 space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <User className="h-5 w-5" />
-            </div>
+        <div className="p-6">
+          {/* Route summary */}
+          <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="font-semibold text-heading">{booking.passengerName}</p>
-              <p className="flex items-center gap-1 text-sm text-body">
-                <Mail className="h-3.5 w-3.5" /> {booking.passengerEmail}
-              </p>
+              <p className="text-xs uppercase tracking-wide text-body">From</p>
+              <p className="text-lg font-bold text-heading">{firstSegment?.startStation ?? '—'}</p>
+            </div>
+            <div className="flex flex-1 items-center justify-center gap-2 text-primary">
+              <span className="h-0.5 flex-1 rounded bg-primary/30" />
+              <Route className="h-5 w-5" />
+              <span className="h-0.5 flex-1 rounded bg-primary/30" />
+            </div>
+            <div className="text-right">
+              <p className="text-xs uppercase tracking-wide text-body">To</p>
+              <p className="text-lg font-bold text-heading">{lastSegment?.endStation ?? '—'}</p>
             </div>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          {/* Train + departure */}
+          <div className="mt-5 grid gap-4 rounded-xl bg-slate-50 p-4 sm:grid-cols-2">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
                 <Train className="h-5 w-5" />
               </div>
               <div>
                 <p className="text-xs text-body">Train</p>
-                <p className="font-semibold text-heading">{trainName}</p>
+                <p className="font-semibold text-heading">
+                  {trainName} {trainNumber && <span className="font-normal text-body">- {trainNumber}</span>}
+                </p>
+                {routeName && <p className="text-xs text-body">{routeName}</p>}
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -181,18 +240,55 @@ function CheckoutPage() {
               </div>
               <div>
                 <p className="text-xs text-body">Departure</p>
-                <p className="font-semibold text-heading">{departureTime}</p>
+                <p className="font-semibold text-heading">
+                  {departureTime} <span className="font-normal text-body">· {departureStation}</span>
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Passenger details */}
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <User className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-xs text-body">Passenger</p>
+                <p className="font-semibold text-heading">{booking.passengerName}</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <MapPin className="h-5 w-5" />
+                <Mail className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-xs text-body">Route</p>
-                <p className="font-semibold text-heading">{route}</p>
+                <p className="text-xs text-body">Email</p>
+                <p className="font-semibold text-heading">{booking.passengerEmail}</p>
               </div>
             </div>
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <Phone className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-xs text-body">Mobile</p>
+                <p className="font-semibold text-heading">{booking.mobileNumber}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <IdCard className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-xs text-body">NIC</p>
+                <p className="font-semibold text-heading">{booking.nic}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Seats + fare */}
+          <div className="mt-5 flex items-center justify-between border-t border-slate-200 pt-4">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
                 <Armchair className="h-5 w-5" />
@@ -202,11 +298,10 @@ function CheckoutPage() {
                 <p className="font-semibold text-heading">{seatNumbers.join(', ')}</p>
               </div>
             </div>
-          </div>
-
-          <div className="flex items-center justify-between border-t border-slate-200 pt-4">
-            <p className="text-body">Total Fare</p>
-            <p className="text-2xl font-bold text-heading">{formatCurrency(booking.totalFare)}</p>
+            <div className="text-right">
+              <p className="text-xs text-body">Total Fare</p>
+              <p className="text-2xl font-bold text-heading">{formatCurrency(booking.totalFare)}</p>
+            </div>
           </div>
         </div>
       </div>
@@ -251,6 +346,19 @@ function CheckoutPage() {
               <CreditCard className="h-4 w-4" />
             )}
             Confirm Payment
+          </button>
+        </div>
+      )}
+
+      {/* Download button for already-confirmed tickets */}
+      {booking.status === 'CONFIRMED' && (
+        <div className="mt-6 flex justify-end">
+          <button
+            type="button"
+            className="btn-outline"
+            onClick={() => downloadTicketPdf()}
+          >
+            <Download className="h-4 w-4" /> Download E-Ticket
           </button>
         </div>
       )}

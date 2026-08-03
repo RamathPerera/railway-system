@@ -10,7 +10,11 @@ import {
   ArrowRight,
   Clock,
   Loader2,
+  Route,
+  LayoutGrid,
+  BookMarked,
 } from 'lucide-react'
+
 
 import { getStations, searchTrips } from '../services/api'
 import SearchableSelect from '../components/SearchableSelect'
@@ -101,12 +105,19 @@ function SearchPage() {
   return (
     <div className="min-h-screen">
       {/* ===== Hero Section ===== */}
-      <section className="bg-gradient-to-br from-primary via-primary-dark to-slate-900 px-4 py-16 text-white">
-        <div className="mx-auto max-w-4xl text-center">
+      <section
+        className="relative bg-cover bg-center px-4 py-20 text-white"
+        style={{ backgroundImage: "url('/src/assets/train-bg.webp')" }}
+      >
+        {/* Dark gradient overlay so the search form pops out clearly */}
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-900/80 via-slate-900/70 to-slate-900/90" />
+
+        <div className="relative mx-auto max-w-4xl text-center">
           <h1 className="heading-1 text-white">Book Your Railway Journey</h1>
           <p className="mt-3 text-lg text-slate-200">
             Search trains, compare fares, and reserve your seat in seconds.
           </p>
+
 
           {/* Search Form */}
           <form
@@ -196,37 +207,59 @@ function SearchPage() {
           <div className="space-y-4">
             <h2 className="heading-2">Available Trains</h2>
             {trips.map((trip) => (
-              <div key={trip.id} className="card-container flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <div
+                key={trip.id}
+                className="card-container flex flex-col gap-4 transition-shadow hover:shadow-md sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div className="flex items-start gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                     <Train className="h-6 w-6" />
                   </div>
-                  <div>
-                    <h3 className="heading-3">{trip.trainName}</h3>
-                    <div className="mt-1 flex items-center gap-4 text-sm text-body">
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-4 w-4" /> {trip.departureTime}
-                      </span>
-                      <span className="font-semibold text-heading">{formatFare(trip.fare)}</span>
+                  <div className="min-w-0">
+                    {/* Route Name -> (TrainName - TrainNumber) */}
+                    <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-primary">
+                      <Route className="h-3.5 w-3.5" /> {trip.routeName || 'Main Line'}
+                    </p>
+                    <h3 className="heading-3 mt-0.5">
+                      {trip.trainName} <span className="font-normal text-body">- {trip.trainNumber}</span>
+                    </h3>
 
+                    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-body">
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-4 w-4 text-primary" />
+                        Departure from <span className="font-semibold text-heading">{originName ?? 'Origin'}</span> at{' '}
+                        <span className="font-semibold text-heading">{trip.departureTime}</span>
+                      </span>
+                    </div>
+
+                    {/* Live coach badges */}
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">
+                        <LayoutGrid className="h-3.5 w-3.5" /> Total Coaches: {trip.totalCoaches}
+                      </span>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                        <BookMarked className="h-3.5 w-3.5" /> Reserved: {trip.reservedCoaches}
+                      </span>
+                      <span className="ml-auto text-lg font-bold text-heading">{formatFare(trip.fare)}</span>
                     </div>
                   </div>
                 </div>
 
                 <button
                   type="button"
-                  className="btn-primary"
+                  className="btn-primary shrink-0"
                   onClick={() =>
                     navigate(`/trip/${trip.id}/seats?start=${origin}&end=${dest}`, {
                       state: {
                         trainName: trip.trainName,
+                        trainNumber: trip.trainNumber,
+                        routeName: trip.routeName,
                         originName,
                         destName,
                         date: trip.departureDate,
                       },
                     })
                   }
-
                 >
                   Select Seats <ArrowRight className="h-4 w-4" />
                 </button>
@@ -234,6 +267,7 @@ function SearchPage() {
             ))}
           </div>
         )}
+
       </section>
     </div>
   )

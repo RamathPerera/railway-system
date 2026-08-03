@@ -39,7 +39,10 @@ export const createBookingSchema = z.object({
 
   passengerName: z.string().min(2, 'passengerName must be at least 2 characters'),
   passengerEmail: z.string().email('passengerEmail must be a valid email'),
+  mobileNumber: z.string().min(10, 'mobileNumber must be at least 10 characters'),
+  nic: z.string().min(5, 'nic must be at least 5 characters'),
 });
+
 
 export type CreateBookingBody = z.infer<typeof createBookingSchema>;
 

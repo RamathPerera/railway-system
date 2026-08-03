@@ -34,6 +34,9 @@ function SeatMapPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [passengerName, setPassengerName] = useState('')
   const [passengerEmail, setPassengerEmail] = useState('')
+  const [mobileNumber, setMobileNumber] = useState('')
+  const [nic, setNic] = useState('')
+
 
   const seatMapQuery = useQuery({
     queryKey: ['seatmap', tripId, start, end],
@@ -71,6 +74,8 @@ function SeatMapPage() {
         seatIds: selectedSeats,
         passengerName,
         passengerEmail,
+        mobileNumber,
+        nic,
       }),
     onSuccess: (data) => {
       toast.success('Booking created successfully')
@@ -78,6 +83,8 @@ function SeatMapPage() {
       setSelectedSeats([])
       setPassengerName('')
       setPassengerEmail('')
+      setMobileNumber('')
+      setNic('')
       // Invalidate the seat map cache so the locked seat no longer shows as
       // Available (Green) if the user navigates back to this page.
       queryClient.invalidateQueries({ queryKey: ['seatmap'] })
@@ -95,8 +102,13 @@ function SeatMapPage() {
       toast.error('Please provide your name and email')
       return
     }
+    if (!mobileNumber.trim() || !nic.trim()) {
+      toast.error('Please provide your mobile number and NIC')
+      return
+    }
     createBookingMutation.mutate()
   }
+
 
   const seatClass = (seat: Seat): string => {
     const isSelected = selectedSeats.includes(seat.id)
@@ -247,8 +259,9 @@ function SeatMapPage() {
                               type="button"
                               disabled={seat.status !== 'AVAILABLE' && !selectedSeats.includes(seat.id)}
                               onClick={() => toggleSeat(seat.id)}
-                              className={`flex h-14 w-14 items-center justify-center rounded-xl text-lg font-bold shadow-sm transition-all duration-200 ${seatClass(seat)}`}
+                              className={`flex h-14 w-14 items-center justify-center rounded-xl text-sm font-bold shadow-sm transition-all duration-200 ${seatClass(seat)}`}
                             >
+                              {activeCoach.coachNo}
                               {seat.seatNo}
                             </button>
                           ))}
@@ -267,12 +280,14 @@ function SeatMapPage() {
                               type="button"
                               disabled={seat.status !== 'AVAILABLE' && !selectedSeats.includes(seat.id)}
                               onClick={() => toggleSeat(seat.id)}
-                              className={`flex h-14 w-14 items-center justify-center rounded-xl text-lg font-bold shadow-sm transition-all duration-200 ${seatClass(seat)}`}
+                              className={`flex h-14 w-14 items-center justify-center rounded-xl text-sm font-bold shadow-sm transition-all duration-200 ${seatClass(seat)}`}
                             >
+                              {activeCoach.coachNo}
                               {seat.seatNo}
                             </button>
                           ))}
                         </div>
+
                       </div>
                     ))}
                   </div>
@@ -357,8 +372,29 @@ function SeatMapPage() {
                   onChange={(e) => setPassengerEmail(e.target.value)}
                 />
               </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-heading">Mobile Number</label>
+                <input
+                  type="tel"
+                  className="input-field"
+                  placeholder="e.g. 0771234567"
+                  value={mobileNumber}
+                  onChange={(e) => setMobileNumber(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-heading">NIC (National Identity Card)</label>
+                <input
+                  type="text"
+                  className="input-field"
+                  placeholder="e.g. 200012345678"
+                  value={nic}
+                  onChange={(e) => setNic(e.target.value)}
+                />
+              </div>
 
               <div className="flex items-center justify-between gap-3 pt-2">
+
                 <p className="text-sm text-body">
                   Seats: <span className="font-semibold text-heading">{selectedSeats.length}</span>
                 </p>

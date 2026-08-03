@@ -22,9 +22,14 @@ export interface TripSearchResult {
   departureDate: string;
   status: string;
   trainName: string;
+  trainNumber: string;
+  routeName: string;
   departureTime: string;
+  totalCoaches: number;
+  reservedCoaches: number;
   fare: number;
 }
+
 
 export const searchTrips = async (
   date: string,
@@ -100,8 +105,11 @@ export const searchTrips = async (
       {
         association: 'schedule',
         where: { routeId },
-        include: [{ association: 'train' }],
+        include: [{ association: 'train' }, { association: 'route' }],
       },
+      // Eager-load the trip's coach snapshot so we can surface live fleet
+      // counts (total coaches + reserved coaches) on each search result.
+      { association: 'coaches', required: false },
     ],
   });
 
@@ -109,16 +117,25 @@ export const searchTrips = async (
   return trips.map((trip) => {
     const schedule = trip.get('schedule') as any;
     const train = schedule?.get?.('train') as any;
+    const route = schedule?.get?.('route') as any;
+    const coaches = (trip.get('coaches') as any[] | undefined) ?? [];
+    const totalCoaches = coaches.length;
+    const reservedCoaches = coaches.filter((c) => c?.classType === 'Reserved').length;
     return {
       id: trip.id,
       departureDate: trip.departureDate,
       status: trip.status,
       trainName: train?.name ?? 'Unknown',
+      trainNumber: train?.number ?? '',
+      routeName: route?.name ?? '',
       departureTime: schedule?.departureTime ?? '',
+      totalCoaches,
+      reservedCoaches,
       fare,
     };
   });
 };
+
 
 export type SeatStatus = 'AVAILABLE' | 'PENDING' | 'BOOKED';
 

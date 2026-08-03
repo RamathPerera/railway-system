@@ -20,7 +20,7 @@ export const createBookingHandler = async (req: Request, res: Response) => {
     });
   }
 
-  const { tripId, startStationId, endStationId, seatIds, passengerName, passengerEmail } = parsed.data;
+  const { tripId, startStationId, endStationId, seatIds, passengerName, passengerEmail, mobileNumber, nic } = parsed.data;
 
   try {
     const result = await createBooking({
@@ -30,7 +30,10 @@ export const createBookingHandler = async (req: Request, res: Response) => {
       seatIds,
       passengerName,
       passengerEmail,
+      mobileNumber,
+      nic,
     });
+
     return res.status(201).json(result);
   } catch (error) {
     if (error instanceof BookingError) {

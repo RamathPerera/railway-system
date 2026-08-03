@@ -30,7 +30,10 @@ export interface CreateBookingParams {
   seatIds: string[];
   passengerName: string;
   passengerEmail: string;
+  mobileNumber: string;
+  nic: string;
 }
+
 
 export interface CreateBookingResult {
   message: string;
@@ -45,7 +48,8 @@ export interface CreateBookingResult {
 export const createBooking = async (
   params: CreateBookingParams
 ): Promise<CreateBookingResult> => {
-  const { tripId, startStationId, endStationId, seatIds, passengerName, passengerEmail } = params;
+  const { tripId, startStationId, endStationId, seatIds, passengerName, passengerEmail, mobileNumber, nic } = params;
+
 
   return sequelize.transaction(async (transaction) => {
     // --- Step A: Resolve the trip, route, segment ordering, and per-seat fare. ---
@@ -162,12 +166,15 @@ export const createBooking = async (
       {
         passengerName,
         passengerEmail,
+        mobileNumber,
+        nic,
         totalFare,
         status: 'PENDING',
         expiresAt,
       },
       { transaction }
     );
+
 
     await BookingSegment.bulkCreate(
       seatIds.map((tripSeatId) => ({
@@ -205,6 +212,8 @@ export interface BookingSegmentSummary {
     departureDate: string;
     status: string;
     trainName: string;
+    trainNumber: string;
+    routeName: string;
     departureTime: string;
   };
 }
@@ -213,12 +222,15 @@ export interface BookingSummary {
   id: string;
   passengerName: string;
   passengerEmail: string;
+  mobileNumber: string;
+  nic: string;
   totalFare: number;
   status: string;
   expiresAt: Date | null;
   createdAt: Date;
   segments: BookingSegmentSummary[];
 }
+
 
 export const getBookingById = async (bookingId: string): Promise<BookingSummary> => {
   const booking = await Booking.findByPk(bookingId, {
@@ -232,10 +244,11 @@ export const getBookingById = async (bookingId: string): Promise<BookingSummary>
             include: [
               {
                 association: 'schedule',
-                include: [{ association: 'train' }],
+                include: [{ association: 'train' }, { association: 'route' }],
               },
             ],
           },
+
           {
             association: 'startStop',
             include: [{ association: 'station' }],
@@ -259,6 +272,8 @@ export const getBookingById = async (bookingId: string): Promise<BookingSummary>
     id: booking.id,
     passengerName: booking.passengerName,
     passengerEmail: booking.passengerEmail,
+    mobileNumber: booking.mobileNumber,
+    nic: booking.nic,
     totalFare: Number(booking.totalFare),
     status: booking.status,
     expiresAt: booking.expiresAt,
@@ -268,6 +283,7 @@ export const getBookingById = async (bookingId: string): Promise<BookingSummary>
       const trip = segment?.trip;
       const schedule = trip?.schedule;
       const train = schedule?.train;
+      const route = schedule?.route;
       const startStop = segment?.startStop;
       const endStop = segment?.endStop;
       return {
@@ -282,11 +298,14 @@ export const getBookingById = async (bookingId: string): Promise<BookingSummary>
           departureDate: trip?.departureDate ?? '',
           status: trip?.status ?? '',
           trainName: train?.name ?? 'Unknown',
+          trainNumber: train?.number ?? '',
+          routeName: route?.name ?? '',
           departureTime: schedule?.departureTime ?? '',
         },
       };
     }),
   };
+
 };
 
 export interface BookingLifecycleResult {

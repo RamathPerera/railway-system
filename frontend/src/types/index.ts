@@ -13,9 +13,14 @@ export interface Trip {
   departureDate: string;
   status: string;
   trainName: string;
+  trainNumber: string;
+  routeName: string;
   departureTime: string;
+  totalCoaches: number;
+  reservedCoaches: number;
   fare: number;
 }
+
 
 // Seat visual states (matches backend SeatStatus).
 export type SeatStatus = 'AVAILABLE' | 'PENDING' | 'BOOKED';
@@ -53,7 +58,10 @@ export interface CreateBookingRequest {
   seatIds: string[];
   passengerName: string;
   passengerEmail: string;
+  mobileNumber: string;
+  nic: string;
 }
+
 
 // POST /bookings -> CreateBookingResponse
 export interface CreateBookingResponse {
@@ -79,6 +87,8 @@ export interface BookingSegmentSummary {
     departureDate: string;
     status: string;
     trainName: string;
+    trainNumber: string;
+    routeName: string;
     departureTime: string;
   };
 }
@@ -87,12 +97,15 @@ export interface Booking {
   id: string;
   passengerName: string;
   passengerEmail: string;
+  mobileNumber: string;
+  nic: string;
   totalFare: number;
   status: string;
   expiresAt: string | null;
   createdAt: string;
   segments: BookingSegmentSummary[];
 }
+
 
 // PATCH /bookings/:id/pay and /bookings/:id/cancel -> BookingLifecycleResponse
 export interface BookingLifecycleResponse {
