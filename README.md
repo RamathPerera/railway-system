@@ -54,7 +54,7 @@ Routes are dynamic entities. Adding a new route (e.g., Matara–Vavuniya) requir
 docker compose up --build
 
 # 2. In a second terminal, seed the database with sample data
-docker exec -it railway_backend_container npm run seed
+docker exec -it railway_backend_container npm run seed:prod
 ```
 
 Once running:

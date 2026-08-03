@@ -31,17 +31,14 @@ function SeatMapPage() {
 
   const toggleSeat = (seatId: string) => {
     setSelectedSeats((prev) => {
-      // Clicking the already-selected seat deselects it.
+      // Clicking the already-selected seat deselects it (radio-button toggle off).
       if (prev.includes(seatId)) {
-        return prev.filter((id) => id !== seatId)
+        return []
       }
-      // Only one seat may be selected at a time for now.
-      if (prev.length >= 1) {
-        toast.error('You can only select 1 seat')
-        return [seatId] // replace the current selection
-      }
+      // Clicking a different seat silently replaces the current selection.
       return [seatId]
     })
+
   }
 
 
