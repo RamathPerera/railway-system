@@ -3,7 +3,8 @@ import { useLocation, useNavigate, useParams, useSearchParams } from 'react-rout
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { toast } from 'sonner'
-import { Loader2, X, CheckCircle2, ArrowLeft } from 'lucide-react'
+import { Loader2, X, CheckCircle2, ArrowLeft, TrainFront } from 'lucide-react'
+
 
 import { getTripSeats, createBooking } from '../services/api'
 import type { Coach, Seat } from '../types'
@@ -41,7 +42,12 @@ function SeatMapPage() {
   })
 
   const coaches: Coach[] = seatMapQuery.data?.coaches ?? []
-  const activeCoach = coaches.find((coach) => coach.id === activeCoachId) ?? coaches[0]
+  // Default to the first Reserved (bookable) coach so the initial selection is
+  // never a disabled Unreserved car. Falls back to the first coach if none exist.
+  const firstReservedCoach = coaches.find((coach) => coach.classType === 'Reserved')
+  const activeCoach =
+    coaches.find((coach) => coach.id === activeCoachId) ?? firstReservedCoach ?? coaches[0]
+
 
   const toggleSeat = (seatId: string) => {
     setSelectedSeats((prev) => {
@@ -152,23 +158,65 @@ function SeatMapPage() {
 
         {seatMapQuery.isSuccess && coaches.length > 0 && activeCoach && (
           <>
-            {/* Coach Tabs */}
-            <div className="flex gap-2 overflow-x-auto pb-2">
-              {coaches.map((coach) => {
-                const isActive = coach.id === activeCoach.id
-                return (
-                  <button
-                    key={coach.id}
-                    type="button"
-                    onClick={() => setActiveCoachId(coach.id)}
-                    className={isActive ? 'btn-primary whitespace-nowrap' : 'btn-outline whitespace-nowrap'}
-                  >
-                    Coach {coach.coachNo}
-                  </button>
+            {/* Train Visual — locomotive + connected coach cars */}
+            <div className="overflow-x-auto pb-2">
+              <div className="flex items-stretch">
+                {/* Locomotive / Engine */}
+                <div className="flex shrink-0 flex-col items-center justify-center gap-1 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 px-4 py-3 text-white shadow-md">
+                  <TrainFront size={32} />
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-300">
+                    Engine
+                  </span>
+                </div>
 
-                )
-              })}
+                {/* Connector between engine and first car */}
+                <div className="flex w-3 shrink-0 items-center">
+                  <div className="h-1 w-full rounded bg-slate-300" />
+                </div>
+
+                {coaches.map((coach, index) => {
+                  const isActive = coach.id === activeCoach.id
+                  const isUnreserved = coach.classType === 'Unreserved'
+                  return (
+                    <div key={coach.id} className="flex shrink-0 items-stretch">
+                      {index > 0 && (
+                        <div className="flex w-3 shrink-0 items-center">
+                          <div className="h-1 w-full rounded bg-slate-300" />
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        disabled={isUnreserved}
+                        aria-disabled={isUnreserved}
+                        title={isUnreserved ? 'Unreserved coach' : `Coach ${coach.coachNo}`}
+                        onClick={() => setActiveCoachId(coach.id)}
+                        className={`flex min-w-[88px] flex-col items-center justify-center gap-1 rounded-xl border px-4 py-3 text-sm font-semibold transition-all duration-200 ${
+                          isUnreserved
+                            ? 'cursor-not-allowed border-slate-200 bg-gray-200 text-gray-500'
+                            : isActive
+                              ? 'scale-105 border-transparent bg-gradient-to-br from-indigo-500 to-blue-500 text-white shadow-md'
+                              : 'border-slate-200 bg-white text-heading shadow-sm hover:border-indigo-300 hover:bg-indigo-50'
+                        }`}
+                      >
+                        <span>Coach {coach.coachNo}</span>
+                        <span
+                          className={`text-[10px] font-medium uppercase tracking-wide ${
+                            isUnreserved
+                              ? 'text-gray-400'
+                              : isActive
+                                ? 'text-indigo-100'
+                                : 'text-slate-400'
+                          }`}
+                        >
+                          {isUnreserved ? 'Unreserved' : coach.classType}
+                        </span>
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
+
 
             {/* Seat Grid */}
             <div className="card-container mt-4">

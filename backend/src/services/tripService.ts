@@ -188,11 +188,11 @@ export const getTripSeatMap = async (
     throw new TripSearchError('Start and end stations must be different', 422);
   }
 
-  // --- Step B: Paginate the Reserved coaches for this trip. ---
-  // Unreserved coaches are not shown on the seat map.
+  // --- Step B: Paginate ALL coaches for this trip (Reserved + Unreserved) so
+  // the frontend can visually represent the entire physical train. ---
   const offset = (page - 1) * limit;
   const { rows: coaches, count: totalCoaches } = await TripCoach.findAndCountAll({
-    where: { tripId, classType: 'Reserved' },
+    where: { tripId },
     order: [['coachNo', 'ASC']],
     limit,
     offset,
@@ -200,6 +200,7 @@ export const getTripSeatMap = async (
     // --- Step C: Eager-load the TripSeat snapshot for each paginated coach. ---
     include: [{ association: 'seats', required: false }],
   });
+
 
   // --- Step D: Find all segments that overlap the requested range and whose
   // parent Booking is CONFIRMED OR (PENDING with an active expiry). ---
