@@ -90,25 +90,52 @@ const seed = async () => {
         { transaction: t }
       );
 
+      // Route 1: Colombo-Badulla Main Line (outbound).
       const mainLine = await Route.create({ name: 'Colombo-Badulla Main Line' }, { transaction: t });
+
+      // Route 2: Badulla-Colombo Main Line (return). Reverse the station order so
+      // Badulla is stop 1 @ 0km and Colombo Fort is stop 27 @ 300km.
+      const returnLine = await Route.create({ name: 'Badulla-Colombo Main Line' }, { transaction: t });
+      const REVERSE_STATIONS = [...STATIONS].reverse().map((s, index) => ({
+        ...s,
+        stopOrder: index + 1,
+        distanceFromOrigin: 300 - s.distanceFromOrigin,
+      }));
 
       // Capture the created RouteStops so we can reference their real UUIDs
       // (route_stops.id) as the startStopId/endStopId foreign keys on segments.
+      // 27 stops for Route 1 + 27 stops for Route 2 = 54 RouteStops total.
       const routeStops = await RouteStop.bulkCreate(
-        STATIONS.map((s, index) => ({
-          routeId: mainLine.id,
-          stationId: stations[index].id,
-          stopOrder: s.stopOrder,
-          distanceFromOrigin: s.distanceFromOrigin,
-        })),
+        [
+          ...STATIONS.map((s, index) => ({
+            routeId: mainLine.id,
+            stationId: stations[index].id,
+            stopOrder: s.stopOrder,
+            distanceFromOrigin: s.distanceFromOrigin,
+          })),
+          ...REVERSE_STATIONS.map((s, index) => ({
+            routeId: returnLine.id,
+            stationId: stations[index].id,
+            stopOrder: s.stopOrder,
+            distanceFromOrigin: s.distanceFromOrigin,
+          })),
+        ],
         { transaction: t }
       );
 
       // Map each stationId -> its RouteStop.id for the mock booking segments.
+      // Route 1 stops are the first 27 created; Route 2 stops are the last 27.
       const routeStopByStation = new Map<string, string>();
-      for (const rs of routeStops) {
-        routeStopByStation.set(rs.stationId, rs.id);
+      const returnStopByStation = new Map<string, string>();
+      for (let i = 0; i < routeStops.length; i++) {
+        const rs = routeStops[i];
+        if (i < STATIONS.length) {
+          routeStopByStation.set(rs.stationId, rs.id);
+        } else {
+          returnStopByStation.set(rs.stationId, rs.id);
+        }
       }
+
 
 
       // --- Train & Master Coaches (Udarata Menike, 8 coaches) ---
@@ -119,26 +146,35 @@ const seed = async () => {
         { transaction: t }
       );
 
-      // --- Schedule (daily 08:30 departure) ---
+      // --- Schedules (bidirectional, same train) ---
+      // Schedule 1: outbound Colombo-Badulla, daily 08:30 departure.
       const schedule = await Schedule.create(
         { routeId: mainLine.id, trainId: menike.id, departureTime: '08:30:00' },
         { transaction: t }
       );
+      // Schedule 2: return Badulla-Colombo, daily 16:30 departure.
+      const returnSchedule = await Schedule.create(
+        { routeId: returnLine.id, trainId: menike.id, departureTime: '16:30:00' },
+        { transaction: t }
+      );
 
-      // --- Trips (7 consecutive days starting today) ---
+      // --- Trips (7 consecutive days starting today, 2 per day) ---
+      // trips[i*2]   = outbound (Schedule 1)
+      // trips[i*2+1] = return   (Schedule 2)
       const trips = await Trip.bulkCreate(
-        Array.from({ length: 7 }, (_, i) => ({
-          scheduleId: schedule.id,
-          departureDate: dateOffset(i),
+        Array.from({ length: 14 }, (_, i) => ({
+          scheduleId: i % 2 === 0 ? schedule.id : returnSchedule.id,
+          departureDate: dateOffset(Math.floor(i / 2)),
           status: 'Scheduled',
         })),
         { transaction: t }
       );
 
-      // --- Trip snapshots: TripCoaches + TripSeats (bulk, ~2940 seats total) ---
+      // --- Trip snapshots: TripCoaches + TripSeats (bulk, ~5,880 seats total) ---
       // For each trip, clone the 8 master coaches and generate their seats.
       // We track the Coach A seat IDs per trip so we can attach mock bookings.
       const coachASeatIdsByTrip: string[][] = [];
+
 
       for (const trip of trips) {
         const tripCoaches = await TripCoach.bulkCreate(
@@ -211,6 +247,18 @@ const seed = async () => {
         }
       }
 
+      // Return-trip (Route 2) distances: Badulla is 0km, Kandy is 179km.
+      const distReturnBadulla = 0;   // Stop 1 on Route 2
+      const distReturnKandy = 179;   // Stop 10 on Route 2 (300 - 121)
+      const fareReturn = roundFare((distReturnKandy - distReturnBadulla) * PRICE_PER_KM); // 179 * 5 = 895
+
+      // Resolve Route 2 RouteStop UUIDs for the return mock booking.
+      const returnBadullaStopId = returnStopByStation.get(stations[26].id);
+      const returnKandyStopId = returnStopByStation.get(stations[9].id);
+      if (!returnBadullaStopId || !returnKandyStopId) {
+        throw new Error('Missing RouteStop for return route - cannot create return booking segments');
+      }
+
       for (let i = 0; i < trips.length; i++) {
 
         const trip = trips[i];
@@ -224,6 +272,8 @@ const seed = async () => {
           {
             passengerName: 'Passenger A',
             passengerEmail: 'passenger.a@example.com',
+            mobileNumber: '+94771234567',
+            nic: '200012345678',
             totalFare: roundFare(fareA * 2), // 1,210.00
             status: 'CONFIRMED',
             expiresAt: null,
@@ -237,6 +287,8 @@ const seed = async () => {
           {
             passengerName: 'Passenger B',
             passengerEmail: 'passenger.b@example.com',
+            mobileNumber: '+94771234567',
+            nic: '200012345678',
             totalFare: roundFare(fareB * 2), // 1,790.00
             status: 'CONFIRMED',
             expiresAt: null,
@@ -249,6 +301,8 @@ const seed = async () => {
           {
             passengerName: 'Passenger C',
             passengerEmail: 'passenger.c@example.com',
+            mobileNumber: '+94771234567',
+            nic: '200012345678',
             totalFare: fareC, // 810.00
             status: 'PENDING',
             expiresAt: lockedUntil,
@@ -278,7 +332,34 @@ const seed = async () => {
           { transaction: t }
         );
 
+        // Return-trip proof: add one CONFIRMED booking on the first Route 2
+        // return trip (index 1), Badulla -> Kandy, Seat 3.
+        if (i === 1) {
+          const seat3 = coachASeats[2]; // Seat 3
+          const returnBooking = await Booking.create(
+            {
+              passengerName: 'Passenger D',
+              passengerEmail: 'passenger.d@example.com',
+              mobileNumber: '+94771234567',
+              nic: '200012345678',
+              totalFare: fareReturn, // 895.00
+              status: 'CONFIRMED',
+              expiresAt: null,
+            },
+            { transaction: t }
+          );
+
+          await BookingSegment.bulkCreate(
+            [
+              // Return booking: one segment (Seat 3), Badulla -> Kandy.
+              { bookingId: returnBooking.id, tripId: trip.id, tripSeatId: seat3, startStopId: returnBadullaStopId, endStopId: returnKandyStopId, fare: fareReturn },
+            ],
+            { transaction: t }
+          );
+        }
+
       }
+
 
       // --- Summary ---
       const stationCount = await Station.count({ transaction: t });
