@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { toast } from 'sonner'
 import { Loader2, X, CheckCircle2, ArrowLeft, TrainFront } from 'lucide-react'
+import { z } from 'zod'
 
 
 import { getTripSeats, createBooking } from '../services/api'
@@ -11,8 +12,23 @@ import { getApiErrorMessage } from '../utils/apiErrors'
 import type { Coach, Seat } from '../types'
 
 
+// Client-side validation mirroring the backend createBookingSchema. Supports
+// international tourists (passports and international mobile numbers).
+const passengerInfoSchema = z.object({
+  passengerName: z.string().min(2, 'Name must be at least 2 characters').max(100),
+  passengerEmail: z.string().email('Invalid email address'),
+  mobileNumber: z
+    .string()
+    .regex(/^\+?[0-9]{10,15}$/, 'Invalid mobile number format. Use 10-15 digits, optionally starting with +'),
+  nic: z
+    .string()
+    .min(4, 'NIC/Passport must be at least 4 characters')
+    .max(20, 'NIC/Passport is too long'),
+})
+
 
 function SeatMapPage() {
+
   const { tripId } = useParams<{ tripId: string }>()
   const [searchParams] = useSearchParams()
   const start = searchParams.get('start') ?? ''
@@ -115,16 +131,25 @@ function SeatMapPage() {
 
   const handleModalSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!passengerName.trim() || !passengerEmail.trim()) {
-      toast.error('Please provide your name and email')
+
+    // Validate all passenger inputs client-side before hitting the backend.
+    // If validation fails, surface the specific error and do NOT call the API.
+    const validationResult = passengerInfoSchema.safeParse({
+      passengerName,
+      passengerEmail,
+      mobileNumber,
+      nic,
+    })
+
+    if (!validationResult.success) {
+      toast.error(validationResult.error.issues[0].message)
       return
     }
-    if (!mobileNumber.trim() || !nic.trim()) {
-      toast.error('Please provide your mobile number and NIC')
-      return
-    }
+
+
     createBookingMutation.mutate()
   }
+
 
 
   const seatClass = (seat: Seat): string => {
@@ -424,22 +449,23 @@ function SeatMapPage() {
                 <input
                   type="tel"
                   className="input-field"
-                  placeholder="e.g. 0771234567"
+                  placeholder="e.g. +94771234567"
                   value={mobileNumber}
                   onChange={(e) => setMobileNumber(e.target.value)}
                 />
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-heading">
-                  NIC (National Identity Card) <span className="text-red-500">*</span>
+                  NIC / Passport Number <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   className="input-field"
-                  placeholder="e.g. 200012345678"
+                  placeholder="e.g. 200012345678 or N1234567"
                   value={nic}
                   onChange={(e) => setNic(e.target.value)}
                 />
+
               </div>
 
 

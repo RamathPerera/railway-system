@@ -124,7 +124,8 @@ function CheckoutPage() {
 
     doc.setFontSize(12)
     doc.text(`Name: ${booking.passengerName}`, 20, 225)
-    doc.text(`NIC: ${booking.nic}`, 20, 235)
+    doc.text(`NIC / Passport: ${booking.nic}`, 20, 235)
+
     doc.text(`Mobile: ${booking.mobileNumber}`, 20, 245)
     doc.text(`Email: ${booking.passengerEmail}`, 20, 255)
 

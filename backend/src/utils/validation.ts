@@ -37,10 +37,16 @@ export const createBookingSchema = z.object({
   // exactly one seat for now.
   seatIds: z.array(z.string().uuid('each seatId must be a valid seat UUID')).length(1, 'You can only book 1 seat per transaction for now'),
 
-  passengerName: z.string().min(2, 'passengerName must be at least 2 characters'),
-  passengerEmail: z.string().email('passengerEmail must be a valid email'),
-  mobileNumber: z.string().min(10, 'mobileNumber must be at least 10 characters'),
-  nic: z.string().min(5, 'nic must be at least 5 characters'),
+  passengerName: z.string().min(2, 'Name must be at least 2 characters').max(100),
+  passengerEmail: z.string().email('Invalid email address'),
+  mobileNumber: z
+    .string()
+    .regex(/^\+?[0-9]{10,15}$/, 'Invalid mobile number format. Use 10-15 digits, optionally starting with +'),
+  nic: z
+    .string()
+    .min(4, 'NIC/Passport must be at least 4 characters')
+    .max(20, 'NIC/Passport is too long'),
+
 });
 
 
