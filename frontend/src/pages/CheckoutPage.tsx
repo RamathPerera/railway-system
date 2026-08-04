@@ -17,8 +17,8 @@ import {
   CheckCircle2,
   XCircle,
   Timer,
-  ArrowLeft,
   Phone,
+
   IdCard,
   Download,
   Route,
@@ -110,13 +110,16 @@ function CheckoutPage() {
     mutationFn: () => confirmBooking(bookingId!),
     onSuccess: async () => {
       toast.success('Payment Successful! E-Ticket Downloaded.')
+      // Clear the stale seat map cache so the seat turns Red (Booked) on the
+      // next visit without requiring a hard refresh.
+      queryClient.invalidateQueries({ queryKey: ['seatmap'] })
       queryClient.invalidateQueries({ queryKey: ['booking', bookingId] })
       try {
         await downloadTicketPdf()
       } catch (error) {
         console.error('Failed to generate PDF:', error)
       }
-      setTimeout(() => navigate('/'), 1500)
+      // No auto-redirect — the user stays on the page and returns Home manually.
     },
     onError: (error) => {
       toast.error(getApiErrorMessage(error, 'Failed to confirm payment'))
@@ -127,12 +130,16 @@ function CheckoutPage() {
     mutationFn: () => cancelBooking(bookingId!),
     onSuccess: () => {
       toast.success('Booking cancelled')
+      // Clear the stale seat map cache so the seat turns Green (Available)
+      // after the cancellation.
+      queryClient.invalidateQueries({ queryKey: ['seatmap'] })
       navigate('/')
     },
     onError: (error) => {
       toast.error(getApiErrorMessage(error, 'Failed to cancel booking'))
     },
   })
+
 
 
   if (bookingQuery.isLoading) {
@@ -169,14 +176,8 @@ function CheckoutPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
-      <button
-        type="button"
-        onClick={() => navigate(-1)}
-        className="mb-4 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium text-body transition-colors hover:bg-slate-100 hover:text-heading"
-      >
-        <ArrowLeft className="h-4 w-4" /> Back
-      </button>
       <h1 className="heading-2 mb-6">Checkout</h1>
+
 
       {/* Status banner */}
       {booking.status === 'CONFIRMED' && (
@@ -361,9 +362,9 @@ function CheckoutPage() {
         </div>
       )}
 
-      {/* Download button for already-confirmed tickets */}
+      {/* Download button + Back to Home for already-confirmed tickets */}
       {booking.status === 'CONFIRMED' && (
-        <div className="mt-6 flex justify-end">
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-center">
           <button
             type="button"
             className="btn-outline"
@@ -371,8 +372,16 @@ function CheckoutPage() {
           >
             <Download className="h-4 w-4" /> Download E-Ticket
           </button>
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={() => navigate('/')}
+          >
+            Back to Home
+          </button>
         </div>
       )}
+
     </div>
   )
 }
