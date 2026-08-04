@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
+
 
 import {
   CreditCard,
@@ -44,9 +44,9 @@ function CheckoutPage() {
   const queryClient = useQueryClient()
 
   const [remainingMs, setRemainingMs] = useState<number | null>(null)
-  const ticketRef = useRef<HTMLDivElement>(null)
 
   const bookingQuery = useQuery({
+
     queryKey: ['booking', bookingId],
     queryFn: () => getBooking(bookingId!),
     enabled: Boolean(bookingId),
@@ -70,61 +70,93 @@ function CheckoutPage() {
 
   const isExpired = remainingMs !== null && remainingMs <= 0
 
-  // Generate and auto-download the E-Ticket PDF from the rendered ticket UI.
-  const downloadTicketPdf = async (): Promise<void> => {
-    try {
-      if (!ticketRef.current) throw new Error('Ticket reference is null')
+  // Generate and auto-download the E-Ticket PDF natively with jsPDF.
+  // Tailwind v4 uses oklch() colors that html2canvas cannot parse, so we draw
+  // the ticket directly with the jsPDF vector API instead of capturing the DOM.
+  const downloadTicketPdf = (): void => {
+    if (!booking) return
 
-      // 1. Wait a bit longer to ensure all fonts and UI elements are fully rendered
-      await new Promise((resolve) => setTimeout(resolve, 300))
+    const doc = new jsPDF()
 
-      // 2. Generate canvas (REMOVE allowTaint: true, keep useCORS: true)
-      const canvas = await html2canvas(ticketRef.current, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#ffffff',
-      })
+    // 1. Header (Blue Background)
 
-      // 3. Get image data
-      const imgData = canvas.toDataURL('image/png')
+    doc.setFillColor(30, 64, 175) // Tailwind indigo-800 approx
+    doc.rect(0, 0, 210, 40, 'F')
 
-      // 4. Initialize PDF (A4 size, portrait)
-      const pdf = new jsPDF('p', 'mm', 'a4')
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(22)
+    doc.text('CeylonRail E-Ticket', 20, 25)
+    doc.setFontSize(12)
+    doc.text(`Booking Ref: ${booking.id.split('-')[0].toUpperCase()}`, 130, 25)
 
-      // 5. Calculate dimensions to fit A4 width
-      const pdfWidth = pdf.internal.pageSize.getWidth()
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width
+    // 1. Train Information
+    doc.setTextColor(0, 0, 0)
+    doc.setFontSize(16)
+    doc.text('Train Information', 20, 60)
 
-      // 6. Add image and save
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight)
-      pdf.save(`Train_Ticket_${bookingId}.pdf`)
-    } catch (error) {
-      console.error('PDF Gen Error:', error)
-      toast.error('Could not generate the E-Ticket PDF. Please try again.')
-    }
+    doc.setFontSize(12)
+    doc.text(`Train: ${trainName} (${trainNumber})`, 20, 75)
+    doc.text(`Main Route: ${routeName}`, 20, 85)
+    doc.text(`Date: ${departureDate}`, 20, 95)
+    doc.text(`Origin Departure: ${departureTime}`, 20, 105)
+
+    // Divider
+    doc.setDrawColor(200, 200, 200)
+    doc.line(20, 115, 190, 115)
+
+    // 2. Journey & Booking Details
+    doc.setFontSize(16)
+    doc.text('Journey & Booking Details', 20, 130)
+
+    doc.setFontSize(12)
+    doc.text(`From: ${originName}`, 20, 145)
+    doc.text(`To: ${destName}`, 20, 155)
+    doc.text(`Seats Booked: ${seatNumbers.join(', ')}`, 20, 165)
+    doc.text(`Total Fare: LKR ${booking.totalFare}`, 20, 175)
+    doc.text(`Status: CONFIRMED`, 20, 185)
+
+    // Divider
+    doc.line(20, 195, 190, 195)
+
+    // 3. Passenger Information
+    doc.setFontSize(16)
+    doc.text('Passenger Information', 20, 210)
+
+    doc.setFontSize(12)
+    doc.text(`Name: ${booking.passengerName}`, 20, 225)
+    doc.text(`NIC: ${booking.nic}`, 20, 235)
+    doc.text(`Mobile: ${booking.mobileNumber}`, 20, 245)
+    doc.text(`Email: ${booking.passengerEmail}`, 20, 255)
+
+
+    // Footer
+    doc.setFontSize(10)
+    doc.setTextColor(150, 150, 150)
+    doc.text('Thank you for choosing CeylonRail. Have a safe journey!', 105, 280, { align: 'center' })
+
+    // 5. Save the PDF
+    doc.save(`Train_Ticket_${bookingId}.pdf`)
+    toast.success('E-Ticket Downloaded!')
   }
 
 
 
   const confirmMutation = useMutation({
     mutationFn: () => confirmBooking(bookingId!),
-    onSuccess: async () => {
+    onSuccess: () => {
       toast.success('Payment Successful! E-Ticket Downloaded.')
       // Clear the stale seat map cache so the seat turns Red (Booked) on the
       // next visit without requiring a hard refresh.
       queryClient.invalidateQueries({ queryKey: ['seatmap'] })
       queryClient.invalidateQueries({ queryKey: ['booking', bookingId] })
-      try {
-        await downloadTicketPdf()
-      } catch (error) {
-        console.error('Failed to generate PDF:', error)
-      }
+      downloadTicketPdf()
       // No auto-redirect — the user stays on the page and returns Home manually.
     },
     onError: (error) => {
       toast.error(getApiErrorMessage(error, 'Failed to confirm payment'))
     },
   })
+
 
   const cancelMutation = useMutation({
     mutationFn: () => cancelBooking(bookingId!),
@@ -169,7 +201,11 @@ function CheckoutPage() {
   const trainNumber = firstSegment?.trip.trainNumber ?? ''
   const routeName = firstSegment?.trip.routeName ?? ''
   const departureTime = firstSegment?.trip.departureTime ?? '—'
+  const departureDate = firstSegment?.trip.departureDate ?? '—'
+  const originName = firstSegment?.startStation ?? '—'
+  const destName = lastSegment?.endStation ?? '—'
   const seatNumbers = booking.segments.map((segment) => `${segment.seatCoachNo}${segment.seatNo}`)
+
 
 
 
@@ -200,7 +236,8 @@ function CheckoutPage() {
       )}
 
       {/* ===== E-Ticket ===== */}
-      <div ref={ticketRef} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+
         {/* Ticket header */}
         <div className="flex items-center justify-between bg-gradient-to-br from-indigo-500 to-blue-500 px-6 py-4 text-white">
           <div className="flex items-center gap-2">
