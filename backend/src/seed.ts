@@ -19,11 +19,18 @@ import { PRICE_PER_KM } from './services/tripService.js';
 const LOCK_DURATION_MS = 10 * 60 * 1000;
 
 // Helper to build an ISO date string (YYYY-MM-DD) offset by N days from today.
+// Uses LOCAL date components (not toISOString, which is UTC) so the seeded
+// departure dates align with the local dates the frontend submits. Between
+// 00:00-05:29 local (UTC+5:30) toISOString would return the previous day.
 const dateOffset = (days: number): string => {
   const d = new Date();
   d.setDate(d.getDate() + days);
-  return d.toISOString().split('T')[0];
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
+
 
 // Round a fare to 2 decimal places, matching the runtime pricing convention.
 const roundFare = (value: number): number => Math.round(value * 100) / 100;
@@ -102,6 +109,14 @@ const seed = async () => {
         distanceFromOrigin: 300 - s.distanceFromOrigin,
       }));
 
+      // Map each station CODE back to its real created UUID. We MUST resolve the
+      // stationId by code (not by array index) because REVERSE_STATIONS is the
+      // reversed array: its index 0 is Badulla, whereas stations[0] is Colombo
+      // Fort. Using index parity here would attach Badulla's stopOrder/distance
+      // to Colombo Fort's UUID (and vice-versa), silently corrupting Route 2's
+      // station->stop mapping and breaking return-trip searches.
+      const stationByCode = new Map(stations.map((st) => [st.code, st]));
+
       // Capture the created RouteStops so we can reference their real UUIDs
       // (route_stops.id) as the startStopId/endStopId foreign keys on segments.
       // 27 stops for Route 1 + 27 stops for Route 2 = 54 RouteStops total.
@@ -113,15 +128,22 @@ const seed = async () => {
             stopOrder: s.stopOrder,
             distanceFromOrigin: s.distanceFromOrigin,
           })),
-          ...REVERSE_STATIONS.map((s, index) => ({
-            routeId: returnLine.id,
-            stationId: stations[index].id,
-            stopOrder: s.stopOrder,
-            distanceFromOrigin: s.distanceFromOrigin,
-          })),
+          ...REVERSE_STATIONS.map((s) => {
+            const st = stationByCode.get(s.code);
+            if (!st) {
+              throw new Error(`Missing created station for code "${s.code}" - cannot build Route 2 stops`);
+            }
+            return {
+              routeId: returnLine.id,
+              stationId: st.id,
+              stopOrder: s.stopOrder,
+              distanceFromOrigin: s.distanceFromOrigin,
+            };
+          }),
         ],
         { transaction: t }
       );
+
 
       // Map each stationId -> its RouteStop.id for the mock booking segments.
       // Route 1 stops are the first 27 created; Route 2 stops are the last 27.

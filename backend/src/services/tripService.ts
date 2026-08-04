@@ -46,12 +46,16 @@ export const searchTrips = async (
     throw new TripSearchError('Unknown origin or destination station', 404);
   }
 
-  // 2. Find a route that contains BOTH stations via RouteStop.
+  // 2. Find ALL routes that contain BOTH stations via RouteStop. Because the
+  //    network is bidirectional (Route 1: Colombo->Badulla, Route 2:
+  //    Badulla->Colombo), the same two stations exist on multiple routes with
+  //    reversed stopOrder. We must scan every route and pick the one whose
+  //    direction actually serves the requested journey.
   const routeStops = await RouteStop.findAll({
     where: { stationId: { [Op.in]: [origin, dest] } },
   });
 
-  // Group stops by route and look for a route containing both stations.
+  // Group stops by route.
   const stopsByRoute = new Map<string, RouteStop[]>();
   for (const rs of routeStops) {
     const list = stopsByRoute.get(rs.routeId) ?? [];
@@ -62,31 +66,38 @@ export const searchTrips = async (
   let originStop: RouteStop | undefined;
   let destStop: RouteStop | undefined;
   let routeId: string | undefined;
+  let foundBothStations = false;
 
+  // 3. Loop through every route. A route is usable only if it contains BOTH
+  //    stations AND the origin stop precedes the destination stop (i.e. the
+  //    trip travels in the requested direction). If a route contains both
+  //    stations but in the wrong direction, skip it and try the next route.
   for (const [rid, stops] of stopsByRoute) {
     const o = stops.find((s) => s.stationId === origin);
     const d = stops.find((s) => s.stationId === dest);
     if (o && d) {
-      originStop = o;
-      destStop = d;
-      routeId = rid;
-      break;
+      foundBothStations = true;
+      if (Number(o.stopOrder) < Number(d.stopOrder)) {
+        originStop = o;
+        destStop = d;
+        routeId = rid;
+        break;
+      }
     }
   }
 
-  if (!originStop || !destStop || !routeId) {
+  // No route contains both stations at all -> 404.
+  if (!foundBothStations) {
     throw new TripSearchError('No route connects the two stations', 404);
   }
 
-  // 3. Validate travel direction. A scheduled trip travels in one specific
-  //    direction (Colombo -> Badulla, stopOrder 1..27). If the origin is not
-  //    before the destination, this train does not serve the requested journey,
-  //    so return an empty result set (frontend shows "No trips found").
-  const originOrder = Number(originStop.stopOrder);
-  const destOrder = Number(destStop.stopOrder);
-  if (originOrder >= destOrder) {
+  // Routes contain both stations, but none travels in the requested direction
+  // (e.g. searching Colombo->Badulla on a day only served by the return line).
+  // Return an empty result set so the frontend shows "No trips found".
+  if (!originStop || !destStop || !routeId) {
     return [];
   }
+
 
   // 4. Dynamic pricing: (dest_distance - origin_distance) * PRICE_PER_KM.
   const originDistance = Number(originStop.distanceFromOrigin);

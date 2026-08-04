@@ -60,7 +60,7 @@ function SearchPage() {
 
   // Restrict booking window to today .. today + 7 days.
   const minDate = toISODate(new Date())
-  const maxDate = toISODate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000))
+  const maxDate = toISODate(new Date(Date.now() + 6 * 24 * 60 * 60 * 1000))
 
   // Stations sorted alphabetically for a better dropdown UX.
   const sortedStations = [...(stationsQuery.data ?? [])].sort((a, b) =>
