@@ -3,7 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import html2canvas from 'html2canvas'
-import { jsPDF } from 'jspdf'
+import jsPDF from 'jspdf'
+
 import {
   CreditCard,
   Loader2,
@@ -71,44 +72,38 @@ function CheckoutPage() {
 
   // Generate and auto-download the E-Ticket PDF from the rendered ticket UI.
   const downloadTicketPdf = async (): Promise<void> => {
-    const element = ticketRef.current
-    if (!element) return
-
     try {
-      // Brief pause so fonts/layout settle before capturing.
-      await new Promise((resolve) => setTimeout(resolve, 100))
+      if (!ticketRef.current) throw new Error('Ticket reference is null')
 
-      const canvas = await html2canvas(element, {
+      // 1. Wait a bit longer to ensure all fonts and UI elements are fully rendered
+      await new Promise((resolve) => setTimeout(resolve, 300))
+
+      // 2. Generate canvas (REMOVE allowTaint: true, keep useCORS: true)
+      const canvas = await html2canvas(ticketRef.current, {
         scale: 2,
-        backgroundColor: '#ffffff',
         useCORS: true,
+        backgroundColor: '#ffffff',
       })
+
+      // 3. Get image data
       const imgData = canvas.toDataURL('image/png')
+
+      // 4. Initialize PDF (A4 size, portrait)
       const pdf = new jsPDF('p', 'mm', 'a4')
-      const pageWidth = pdf.internal.pageSize.getWidth()
-      const pageHeight = pdf.internal.pageSize.getHeight()
-      const imgWidth = pageWidth
-      const imgHeight = (canvas.height * imgWidth) / canvas.width
 
-      let heightLeft = imgHeight
-      let position = 0
+      // 5. Calculate dimensions to fit A4 width
+      const pdfWidth = pdf.internal.pageSize.getWidth()
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width
 
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
-      heightLeft -= pageHeight
-
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight
-        pdf.addPage()
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
-        heightLeft -= pageHeight
-      }
-
+      // 6. Add image and save
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight)
       pdf.save(`Train_Ticket_${bookingId}.pdf`)
     } catch (error) {
-      console.error('Failed to generate PDF:', error)
+      console.error('PDF Gen Error:', error)
       toast.error('Could not generate the E-Ticket PDF. Please try again.')
     }
   }
+
 
 
   const confirmMutation = useMutation({
@@ -167,7 +162,8 @@ function CheckoutPage() {
   const trainNumber = firstSegment?.trip.trainNumber ?? ''
   const routeName = firstSegment?.trip.routeName ?? ''
   const departureTime = firstSegment?.trip.departureTime ?? '—'
-  const seatNumbers = booking.segments.map((segment) => segment.seatNo)
+  const seatNumbers = booking.segments.map((segment) => `${segment.seatCoachNo}${segment.seatNo}`)
+
 
 
 

@@ -107,7 +107,7 @@ function SearchPage() {
 
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-slate-50">
       {/* ===== Hero Section ===== */}
       <section
         className="relative bg-cover bg-center px-4 py-20 text-white"
@@ -263,7 +263,10 @@ function SearchPage() {
                         originName,
                         destName,
                         date: trip.departureDate,
+                        departureTime: trip.departureTime,
+                        totalCoaches: trip.totalCoaches,
                       },
+
                     })
                   }
                 >

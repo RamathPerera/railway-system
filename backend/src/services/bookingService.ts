@@ -204,9 +204,11 @@ export interface BookingSegmentSummary {
   id: string;
   seatId: string;
   seatNo: number;
+  seatCoachNo: string;
   fare: number;
   startStation: string;
   endStation: string;
+
   trip: {
     id: string;
     departureDate: string;
@@ -238,7 +240,8 @@ export const getBookingById = async (bookingId: string): Promise<BookingSummary>
       {
         association: 'segments',
         include: [
-          { association: 'seat' },
+          { association: 'seat', include: [{ association: 'tripCoach' }] },
+
           {
             association: 'trip',
             include: [
@@ -290,9 +293,11 @@ export const getBookingById = async (bookingId: string): Promise<BookingSummary>
         id: segment.id,
         seatId: segment.tripSeatId,
         seatNo: seat?.seatNo ?? 0,
+        seatCoachNo: seat?.tripCoach?.coachNo ?? '',
         fare: Number(segment.fare),
         startStation: startStop?.station?.name ?? 'Unknown',
         endStation: endStop?.station?.name ?? 'Unknown',
+
         trip: {
           id: trip?.id ?? '',
           departureDate: trip?.departureDate ?? '',

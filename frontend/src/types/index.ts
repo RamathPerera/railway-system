@@ -79,9 +79,11 @@ export interface BookingSegmentSummary {
   id: string;
   seatId: string;
   seatNo: number;
+  seatCoachNo: string;
   fare: number;
   startStation: string;
   endStation: string;
+
   trip: {
     id: string;
     departureDate: string;

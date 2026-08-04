@@ -24,11 +24,25 @@ function SeatMapPage() {
 
   // Human-readable names passed via router state (fallback for direct URL access).
   const state = location.state as
-    | Partial<{ trainName: string; originName: string; destName: string }>
+    | Partial<{
+        trainName: string
+        trainNumber: string
+        routeName: string
+        originName: string
+        destName: string
+        date: string
+        departureTime: string
+        totalCoaches: number
+      }>
     | null
   const headerTrain = state?.trainName ?? tripId ?? 'Trip'
   const headerRoute =
     state?.originName && state?.destName ? `${state.originName} → ${state.destName}` : '—'
+  const headerRouteName = state?.routeName ?? '—'
+  const headerDate = state?.date ?? '—'
+  const headerDepartureTime = state?.departureTime ?? '—'
+  const headerTotalCoaches = state?.totalCoaches ?? '—'
+
 
 
   const [activeCoachId, setActiveCoachId] = useState<string | null>(null)
@@ -134,22 +148,44 @@ function SeatMapPage() {
     <div className="min-h-screen pb-28">
       {/* Header */}
       <header className="bg-gradient-to-br from-primary via-primary-dark to-slate-900 px-4 py-8 text-white">
-        <div className="mx-auto max-w-7xl">
+        <div className="mx-auto flex max-w-7xl flex-col justify-between gap-6 sm:flex-row sm:items-center">
+          {/* Left: back + title + route */}
+          <div>
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="mb-4 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+            >
+              <ArrowLeft className="h-4 w-4" /> Back
+            </button>
+            <h1 className="heading-1 text-white">Select Your Seats</h1>
+            <p className="mt-2 text-slate-200">
+              Train: <span className="font-semibold">{headerTrain}</span> ·{' '}
+              <span className="font-semibold">{headerRoute}</span>
+            </p>
+            {headerRouteName !== '—' && (
+              <p className="mt-1 text-sm text-slate-300">{headerRouteName}</p>
+            )}
+          </div>
 
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className="mb-4 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
-          >
-            <ArrowLeft className="h-4 w-4" /> Back
-          </button>
-          <h1 className="heading-1 text-white">Select Your Seats</h1>
-          <p className="mt-2 text-slate-200">
-            Train: <span className="font-semibold">{headerTrain}</span> ·{' '}
-            <span className="font-semibold">{headerRoute}</span>
-          </p>
+          {/* Right: extra trip details */}
+          <div className="flex flex-wrap gap-3 sm:justify-end">
+            <div className="rounded-lg bg-white/10 px-4 py-2 backdrop-blur">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-300">Departure Date</p>
+              <p className="text-sm font-semibold text-white">{headerDate}</p>
+            </div>
+            <div className="rounded-lg bg-white/10 px-4 py-2 backdrop-blur">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-300">Departure Time</p>
+              <p className="text-sm font-semibold text-white">{headerDepartureTime}</p>
+            </div>
+            <div className="rounded-lg bg-white/10 px-4 py-2 backdrop-blur">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-300">Total Coaches</p>
+              <p className="text-sm font-semibold text-white">{headerTotalCoaches}</p>
+            </div>
+          </div>
         </div>
       </header>
+
 
 
       <main className="mx-auto max-w-7xl px-4 py-8">
@@ -179,11 +215,12 @@ function SeatMapPage() {
               <div className="flex items-stretch">
                 {/* Locomotive / Engine */}
                 <div className="flex shrink-0 flex-col items-center justify-center gap-1 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 px-4 py-3 text-white shadow-md">
-                  <TrainFront size={32} />
+                  <TrainFront size={32} className="-scale-x-100" />
                   <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-300">
                     Engine
                   </span>
                 </div>
+
 
                 {/* Connector between engine and first car */}
                 <div className="flex w-3 shrink-0 items-center">
